@@ -1116,113 +1116,125 @@ function hideMapperModal() {
 }
 
 async function confirmMapping() {
-  const listType = document.getElementById('import-list-type').value;
-  const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
-  
-  // Check required fields
-  const requiredFields = fields.filter(f => f.required);
-  for (const field of requiredFields) {
-    if (columnMapping[field.key] === undefined) {
-      return alert(`${field.label} is required`);
+  try {
+    const listType = document.getElementById('import-list-type').value;
+    const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
+    
+    // Check required fields
+    const requiredFields = fields.filter(f => f.required);
+    for (const field of requiredFields) {
+      if (columnMapping[field.key] === undefined) {
+        return alert(`${field.label} is required`);
+      }
     }
-  }
-  
-  const showId = document.getElementById('import-show').value;
-  const repId = listType === LIST_TYPES.HIT_LIST ? (document.getElementById('import-rep').value || null) : null;
-  
-  console.log('Import settings:', { showId, repId, listType });
-  
-  const { lines } = pendingImportData;
-  
-  // Handle People list separately
-  if (listType === LIST_TYPES.PEOPLE) {
-    const newPeople = [];
+    
+    const showId = document.getElementById('import-show').value;
+    const repId = listType === LIST_TYPES.HIT_LIST ? (document.getElementById('import-rep').value || null) : null;
+    
+    console.log('Import settings:', { showId, repId, listType });
+    console.log('Column mapping:', columnMapping);
+    
+    const { lines } = pendingImportData;
+    console.log('Lines to import:', lines.length);
+    
+    // Handle People list separately
+    if (listType === LIST_TYPES.PEOPLE) {
+      const newPeople = [];
+      for (const vals of lines) {
+        const person = {
+          id: `${showId}_person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          showId,
+          firstName: columnMapping.firstName !== undefined ? vals[columnMapping.firstName] || '' : '',
+          lastName: columnMapping.lastName !== undefined ? vals[columnMapping.lastName] || '' : '',
+          jobTitle: columnMapping.jobTitle !== undefined ? vals[columnMapping.jobTitle] || '' : '',
+          companyName: columnMapping.companyName !== undefined ? vals[columnMapping.companyName] || '' : '',
+          domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] || '' : '',
+          sales: columnMapping.sales !== undefined ? vals[columnMapping.sales] || '' : '',
+          dateCompleted: columnMapping.dateCompleted !== undefined ? vals[columnMapping.dateCompleted] || '' : ''
+        };
+        
+        if (person.firstName || person.lastName) newPeople.push(person);
+      }
+      
+      if (newPeople.length === 0) return alert('No valid data found');
+      
+      await deletePeopleForShow(showId);
+      await savePeople(newPeople);
+      
+      hideMapperModal();
+      hideAdminModal();
+      alert(`Imported ${newPeople.length} people`);
+      return;
+    }
+    
+    // Handle booth-based lists
+    const newBooths = [];
+    
     for (const vals of lines) {
-      const person = {
-        id: `${showId}_person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        showId,
-        firstName: columnMapping.firstName !== undefined ? vals[columnMapping.firstName] || '' : '',
-        lastName: columnMapping.lastName !== undefined ? vals[columnMapping.lastName] || '' : '',
-        jobTitle: columnMapping.jobTitle !== undefined ? vals[columnMapping.jobTitle] || '' : '',
-        companyName: columnMapping.companyName !== undefined ? vals[columnMapping.companyName] || '' : '',
-        domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] || '' : '',
-        sales: columnMapping.sales !== undefined ? vals[columnMapping.sales] || '' : '',
-        dateCompleted: columnMapping.dateCompleted !== undefined ? vals[columnMapping.dateCompleted] || '' : ''
+      const getValue = (key) => columnMapping[key] !== undefined ? (vals[columnMapping[key]] || '') : '';
+      const getNumeric = (key) => {
+        const val = getValue(key);
+        return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
       };
       
-      if (person.firstName || person.lastName) newPeople.push(person);
+      const booth = {
+        id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        showId,
+        repId,
+        listType,
+        companyName: getValue('companyName'),
+        boothNumber: getValue('boothNumber'),
+        domain: getValue('domain'),
+        estimatedMonthlySales: getNumeric('estimatedMonthlySales'),
+        platform: getValue('platform'),
+        protection: getValue('protection'),
+        returns: getValue('returns'),
+        status: STATUS.NOT_VISITED,
+        notes: '',
+        contactName: '',
+        ordersPerMonth: 'N/A',
+        aov: 'N/A',
+        businessCardData: null,
+        // Extended fields
+        recordId: getValue('recordId'),
+        ownerId: getValue('ownerId'),
+        lastContacted: getValue('lastContacted'),
+        campaign: getValue('campaign'),
+        competitorInstalls: getValue('competitorInstalls'),
+        competitorUninstalls: getValue('competitorUninstalls'),
+        techInstalls: getValue('techInstalls'),
+        instagramFollowers: getNumeric('instagramFollowers'),
+        facebookFollowers: getNumeric('facebookFollowers'),
+        monthlyVisits: getNumeric('monthlyVisits'),
+        associatedDeal: getValue('associatedDeal'),
+        associatedDealIds: getValue('associatedDealIds'),
+        dealRecordId: getValue('dealRecordId'),
+        dealName: getValue('dealName')
+      };
+      
+      if (booth.companyName) newBooths.push(booth);
     }
     
-    if (newPeople.length === 0) return alert('No valid data found');
+    console.log('Booths to save:', newBooths.length);
+    if (newBooths.length === 0) return alert('No valid data found');
     
-    await deletePeopleForShow(showId);
-    await savePeople(newPeople);
+    console.log('Calling deleteBoothsForList...');
+    await deleteBoothsForList(showId, repId, listType);
     
+    console.log('Calling saveBooths...');
+    await saveBooths(newBooths);
+    
+    console.log('Import complete');
     hideMapperModal();
     hideAdminModal();
-    alert(`Imported ${newPeople.length} people`);
-    return;
-  }
-  
-  // Handle booth-based lists
-  const newBooths = [];
-  
-  for (const vals of lines) {
-    const getValue = (key) => columnMapping[key] !== undefined ? (vals[columnMapping[key]] || '') : '';
-    const getNumeric = (key) => {
-      const val = getValue(key);
-      return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
-    };
+    alert(`Imported ${newBooths.length} records`);
     
-    const booth = {
-      id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      showId,
-      repId,
-      listType,
-      companyName: getValue('companyName'),
-      boothNumber: getValue('boothNumber'),
-      domain: getValue('domain'),
-      estimatedMonthlySales: getNumeric('estimatedMonthlySales'),
-      platform: getValue('platform'),
-      protection: getValue('protection'),
-      returns: getValue('returns'),
-      status: STATUS.NOT_VISITED,
-      notes: '',
-      contactName: '',
-      ordersPerMonth: 'N/A',
-      aov: 'N/A',
-      businessCardData: null,
-      // Extended fields
-      recordId: getValue('recordId'),
-      ownerId: getValue('ownerId'),
-      lastContacted: getValue('lastContacted'),
-      campaign: getValue('campaign'),
-      competitorInstalls: getValue('competitorInstalls'),
-      competitorUninstalls: getValue('competitorUninstalls'),
-      techInstalls: getValue('techInstalls'),
-      instagramFollowers: getNumeric('instagramFollowers'),
-      facebookFollowers: getNumeric('facebookFollowers'),
-      monthlyVisits: getNumeric('monthlyVisits'),
-      associatedDeal: getValue('associatedDeal'),
-      associatedDealIds: getValue('associatedDealIds'),
-      dealRecordId: getValue('dealRecordId'),
-      dealName: getValue('dealName')
-    };
-    
-    if (booth.companyName) newBooths.push(booth);
-  }
-  
-  if (newBooths.length === 0) return alert('No valid data found');
-  
-  await deleteBoothsForList(showId, repId, listType);
-  await saveBooths(newBooths);
-  
-  hideMapperModal();
-  hideAdminModal();
-  alert(`Imported ${newBooths.length} records`);
-  
-  if (currentShowId === showId) {
-    await loadBoothList();
-    renderBoothList();
+    if (currentShowId === showId) {
+      await loadBoothList();
+      renderBoothList();
+    }
+  } catch (err) {
+    console.error('Import error:', err);
+    alert('Import failed: ' + err.message);
   }
 }
