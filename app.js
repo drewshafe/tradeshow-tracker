@@ -1130,6 +1130,8 @@ async function confirmMapping() {
   const showId = document.getElementById('import-show').value;
   const repId = listType === LIST_TYPES.HIT_LIST ? (document.getElementById('import-rep').value || null) : null;
   
+  console.log('Import settings:', { showId, repId, listType });
+  
   const { lines } = pendingImportData;
   
   // Handle People list separately

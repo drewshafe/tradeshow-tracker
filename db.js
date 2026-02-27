@@ -130,10 +130,13 @@
 
   // Get booths for a rep's hit list INCLUDING tagged Working/Opps
   window.getHitListWithTags = async function(showId, repId) {
+    console.log('getHitListWithTags called:', { showId, repId });
     const allBooths = await window.getAllBoothsForShow(showId);
+    console.log('All booths for show:', allBooths.length, allBooths.map(b => ({ id: b.id, repId: b.repId, listType: b.listType })));
     
     // Get direct hit list items
     const hitList = allBooths.filter(b => b.listType === LIST_TYPES.HIT_LIST && b.repId === repId);
+    console.log('Hit list items:', hitList.length);
     
     // Get Working items assigned to this rep (via ownerId -> repId mapping)
     const working = allBooths.filter(b => b.listType === LIST_TYPES.WORKING && getRepIdFromOwner(b.ownerId) === repId)
