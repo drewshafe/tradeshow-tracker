@@ -23,18 +23,16 @@ async function initDB() {
 }
 
 async function initializeDefaults() {
-  const shows = await getShows();
+  let shows = JSON.parse(localStorage.getItem('shows') || '[]');
   if (shows.length === 0) {
-    for (const show of DEFAULT_SHOWS) {
-      await saveShow(show);
-    }
+    shows = DEFAULT_SHOWS;
+    localStorage.setItem('shows', JSON.stringify(shows));
   }
   
-  const reps = await getReps();
+  let reps = JSON.parse(localStorage.getItem('reps') || '[]');
   if (reps.length === 0) {
-    for (const rep of DEFAULT_REPS) {
-      await saveRep(rep);
-    }
+    reps = DEFAULT_REPS;
+    localStorage.setItem('reps', JSON.stringify(reps));
   }
 }
 
