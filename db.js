@@ -110,6 +110,7 @@
       let query = sbClient.from('booths').select('*').eq('show_id', showId);
       if (repId) query = query.eq('rep_id', repId);
       if (listType) query = query.eq('list_type', listType);
+      query = query.limit(10000);
       const { data } = await query;
       return (data || []).map(mapBoothFromDB);
     }
@@ -122,7 +123,7 @@
 
   window.getAllBoothsForShow = async function(showId) {
     if (useSupabase) {
-      const { data } = await sbClient.from('booths').select('*').eq('show_id', showId);
+      const { data } = await sbClient.from('booths').select('*').eq('show_id', showId).limit(10000);
       return (data || []).map(mapBoothFromDB);
     }
     return JSON.parse(localStorage.getItem('booths') || '[]').filter(b => b.showId === showId);
