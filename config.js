@@ -1,7 +1,6 @@
 // Supabase Configuration
-// TODO: Replace with your Supabase project credentials
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key';
+const SUPABASE_URL = 'https://qnscnhccaedrwwmjxhuc.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_uKmMzyUx5EkAs8GmETBTgw_e2WsKTNn';
 
 // Status Options
 const STATUS = {
