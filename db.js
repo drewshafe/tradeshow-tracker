@@ -168,8 +168,14 @@
   };
 
   window.saveBooths = async function(boothsToSave) {
+    console.log('saveBooths called with', boothsToSave.length, 'booths');
+    console.log('First booth:', boothsToSave[0]);
     if (useSupabase) {
-      await sbClient.from('booths').upsert(boothsToSave.map(mapBoothToDB));
+      const mapped = boothsToSave.map(mapBoothToDB);
+      console.log('First mapped booth for DB:', mapped[0]);
+      const { data, error } = await sbClient.from('booths').upsert(mapped);
+      if (error) console.error('Supabase upsert error:', error);
+      else console.log('Supabase upsert success');
     } else {
       const existing = JSON.parse(localStorage.getItem('booths') || '[]');
       const existingIds = new Set(existing.map(b => b.id));
@@ -180,11 +186,14 @@
   };
 
   window.deleteBoothsForList = async function(showId, repId, listType) {
+    console.log('deleteBoothsForList called:', { showId, repId, listType });
     if (useSupabase) {
       let query = sbClient.from('booths').delete().eq('show_id', showId).eq('list_type', listType);
       if (repId) query = query.eq('rep_id', repId);
       else query = query.is('rep_id', null);
-      await query;
+      const { error } = await query;
+      if (error) console.error('Delete error:', error);
+      else console.log('Delete success');
     } else {
       const booths = JSON.parse(localStorage.getItem('booths') || '[]')
         .filter(b => !(b.showId === showId && b.repId === repId && b.listType === listType));
