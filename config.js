@@ -98,33 +98,160 @@ const DEFAULT_SHOWS = [
 
 // Default Reps
 const DEFAULT_REPS = [
-  { id: 'drew', name: 'Drew' },
-  { id: 'jason', name: 'Jason' },
-  { id: 'wyatt', name: 'Wyatt' }
+  { id: 'drew', name: 'Drew', hubspotId: '769264684' },
+  { id: 'jason', name: 'Jason', hubspotId: '466111025' },
+  { id: 'wyatt', name: 'Wyatt', hubspotId: '440420991' },
+  { id: 'david', name: 'David', hubspotId: '415804257' }
 ];
+
+// HubSpot Owner ID Mapping
+const HUBSPOT_OWNERS = {
+  '769264684': { repId: 'drew', name: 'Drew Shafer', isTradeShowRep: true },
+  '466111025': { repId: 'jason', name: 'Jason Kizerian', isTradeShowRep: true },
+  '440420991': { repId: 'wyatt', name: 'Wyatt Branch', isTradeShowRep: true },
+  '415804257': { repId: 'david', name: 'David Dustin', isTradeShowRep: true },
+  '47558866': { repId: null, name: 'Marina H', isTradeShowRep: false },
+  '79525794': { repId: null, name: 'Morgan Hirschi', isTradeShowRep: false },
+  '82567118': { repId: null, name: 'David Puche', isTradeShowRep: false },
+  '84255609': { repId: null, name: 'Jhofre Marquez', isTradeShowRep: false },
+  '87648047': { repId: null, name: 'Lexi Kilgannon', isTradeShowRep: false },
+  '88065988': { repId: null, name: 'Clara Hayes', isTradeShowRep: false },
+  '213567081': { repId: null, name: 'Ship Insure', isTradeShowRep: false },
+  '213597303': { repId: null, name: 'Mosie Matalon', isTradeShowRep: false },
+  '226275085': { repId: null, name: 'Merchant Support', isTradeShowRep: false },
+  '231531570': { repId: null, name: 'Ezra Shabot', isTradeShowRep: false },
+  '444928300': { repId: null, name: 'Mark Curtis', isTradeShowRep: false },
+  '482560570': { repId: null, name: 'Lauren Hong', isTradeShowRep: false },
+  '489743668': { repId: null, name: 'Noah Bump', isTradeShowRep: false },
+  '520676645': { repId: null, name: 'Rambo Ruiz', isTradeShowRep: false },
+  '552815775': { repId: null, name: 'Nate Kane', isTradeShowRep: false },
+  '1305231186': { repId: null, name: 'Corbin Ekblad', isTradeShowRep: false },
+  '1342408095': { repId: null, name: 'Addison Lynch', isTradeShowRep: false },
+  '1419091023': { repId: null, name: 'Dane Baker', isTradeShowRep: false },
+  '1844165169': { repId: null, name: 'Peter Twomey', isTradeShowRep: false },
+  '2039488175': { repId: null, name: 'Riley Sorenson', isTradeShowRep: false }
+};
 
 // List Types
 const LIST_TYPES = {
   HIT_LIST: 'hit_list',
   MASTER: 'master',
   CUSTOMERS: 'customers',
-  CURRENT_OPPS: 'current_opps'
+  WORKING: 'working',
+  OPPS: 'opps',
+  INACTIVE_CUSTOMERS: 'inactive_customers',
+  PEOPLE: 'people'
 };
 
 const LIST_LABELS = {
   [LIST_TYPES.HIT_LIST]: 'Hit List',
   [LIST_TYPES.MASTER]: 'Master',
   [LIST_TYPES.CUSTOMERS]: 'Customers',
-  [LIST_TYPES.CURRENT_OPPS]: 'Current Opps'
+  [LIST_TYPES.WORKING]: 'Working',
+  [LIST_TYPES.OPPS]: 'Opps',
+  [LIST_TYPES.INACTIVE_CUSTOMERS]: 'Inactive Customers',
+  [LIST_TYPES.PEOPLE]: 'People'
 };
 
-// Required fields for import mapping
-const REQUIRED_FIELDS = [
-  { key: 'companyName', label: 'Company Name', required: true },
-  { key: 'boothNumber', label: 'Booth Number', required: false },
-  { key: 'domain', label: 'Domain', required: false },
-  { key: 'estimatedMonthlySales', label: 'Est. Monthly Sales', required: false },
-  { key: 'platform', label: 'Platform', required: false },
-  { key: 'protection', label: 'Protection', required: false },
-  { key: 'returns', label: 'Returns', required: false }
-];
+// List configurations
+const LIST_CONFIG = {
+  [LIST_TYPES.HIT_LIST]: { hasDetail: true, showRep: true, canClaim: false, isGrid: false },
+  [LIST_TYPES.MASTER]: { hasDetail: false, showRep: true, canClaim: false, isGrid: true },
+  [LIST_TYPES.CUSTOMERS]: { hasDetail: false, showRep: true, canClaim: false, isGrid: true },
+  [LIST_TYPES.WORKING]: { hasDetail: false, showRep: true, canClaim: false, isGrid: true, tagInHitList: 'Working' },
+  [LIST_TYPES.OPPS]: { hasDetail: false, showRep: true, canClaim: false, isGrid: true, tagInHitList: 'Opps' },
+  [LIST_TYPES.INACTIVE_CUSTOMERS]: { hasDetail: true, showRep: true, canClaim: true, isGrid: false },
+  [LIST_TYPES.PEOPLE]: { hasDetail: false, showRep: false, canClaim: false, isGrid: true }
+};
+
+// CSV field mappings per list type
+const CSV_FIELDS = {
+  [LIST_TYPES.MASTER]: [
+    { key: 'recordId', label: 'Record ID', required: false },
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'competitorInstalls', label: 'Competitor Tracking - Installs', required: false },
+    { key: 'competitorUninstalls', label: 'Competitor Tracking - Uninstalls', required: false },
+    { key: 'techInstalls', label: 'Tech Tracking - Installs', required: false },
+    { key: 'instagramFollowers', label: 'Instagram Followers', required: false },
+    { key: 'facebookFollowers', label: 'Facebook Followers', required: false },
+    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false }
+  ],
+  [LIST_TYPES.CUSTOMERS]: [
+    { key: 'recordId', label: 'Record ID - Company', required: false },
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'ownerId', label: 'Company owner', required: false },
+    { key: 'associatedDeal', label: 'Associated Deal', required: false },
+    { key: 'associatedDealIds', label: 'Associated Deal IDs', required: false },
+    { key: 'dealRecordId', label: 'Record ID - Deal', required: false },
+    { key: 'dealName', label: 'Deal Name', required: false }
+  ],
+  [LIST_TYPES.WORKING]: [
+    { key: 'recordId', label: 'Record ID', required: false },
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'lastContacted', label: 'Last Contacted', required: false },
+    { key: 'ownerId', label: 'Company owner', required: false },
+    { key: 'campaign', label: 'Campaign', required: false }
+  ],
+  [LIST_TYPES.OPPS]: [
+    { key: 'recordId', label: 'Record ID', required: false },
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'lastContacted', label: 'Last Contacted', required: false },
+    { key: 'ownerId', label: 'Company owner', required: false }
+  ],
+  [LIST_TYPES.INACTIVE_CUSTOMERS]: [
+    { key: 'recordId', label: 'Record ID', required: false },
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'lastContacted', label: 'Last Contacted', required: false },
+    { key: 'ownerId', label: 'Company owner', required: false }
+  ],
+  [LIST_TYPES.PEOPLE]: [
+    { key: 'firstName', label: 'First Name', required: true },
+    { key: 'lastName', label: 'Last Name', required: false },
+    { key: 'jobTitle', label: 'Job title', required: false },
+    { key: 'companyName', label: 'Company Name', required: false },
+    { key: 'domain', label: 'Company domain name', required: false },
+    { key: 'sales', label: 'Sales', required: false },
+    { key: 'dateCompleted', label: 'Date Completed', required: false }
+  ],
+  [LIST_TYPES.HIT_LIST]: [
+    { key: 'companyName', label: 'Company Name', required: true },
+    { key: 'boothNumber', label: 'Booth Number', required: false },
+    { key: 'domain', label: 'Domain', required: false },
+    { key: 'estimatedMonthlySales', label: 'Est. Monthly Sales', required: false },
+    { key: 'platform', label: 'Platform', required: false },
+    { key: 'protection', label: 'Protection', required: false },
+    { key: 'returns', label: 'Returns', required: false }
+  ]
+};
+
+// Helper function to get owner name from HubSpot ID
+function getOwnerName(ownerId) {
+  const owner = HUBSPOT_OWNERS[String(ownerId)];
+  return owner ? owner.name : ownerId || 'Unassigned';
+}
+
+// Helper function to get rep ID from HubSpot owner ID
+function getRepIdFromOwner(ownerId) {
+  const owner = HUBSPOT_OWNERS[String(ownerId)];
+  return owner?.isTradeShowRep ? owner.repId : null;
+}

@@ -95,6 +95,42 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); c
 .sales-value { font-size: 14px; font-weight: 600; color: var(--green); }
 .booth-right i { color: var(--text-dim); font-size: 14px; }
 
+/* Grid View */
+.grid-view { background: var(--card); border-radius: 10px; overflow: hidden; }
+.grid-header { display: grid; grid-template-columns: 60px 1fr 80px 100px 100px; padding: 10px 14px; background: var(--border); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; gap: 8px; }
+.grid-row { display: grid; grid-template-columns: 60px 1fr 80px 100px 100px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; gap: 8px; align-items: center; }
+.grid-row:last-child { border-bottom: none; }
+.grid-row .primary { font-weight: 500; }
+.grid-row .booth-num { color: var(--blue); font-weight: 600; }
+.grid-row .sales { color: var(--green); font-weight: 500; }
+.grid-row .owner { color: var(--text-muted); font-size: 12px; }
+.grid-row .domain { color: var(--text-muted); font-size: 12px; }
+
+/* Tags */
+.item-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+.item-tag.working { background: rgba(77,171,247,0.2); color: var(--blue); }
+.item-tag.opps { background: rgba(107,203,119,0.2); color: var(--green); }
+.item-tag.claimed { background: rgba(255,217,61,0.2); color: var(--yellow); }
+.detail-tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+.detail-tag.working { background: rgba(77,171,247,0.2); color: var(--blue); }
+.detail-tag.opps { background: rgba(107,203,119,0.2); color: var(--green); }
+
+.company-row { display: flex; align-items: center; }
+.owner-badge { margin-left: 8px; font-size: 11px; color: var(--text-muted); background: var(--border); padding: 2px 6px; border-radius: 8px; }
+
+/* Claim Button */
+.claim-btn { padding: 6px 12px; background: var(--blue); border: none; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.claim-btn:active { transform: scale(0.95); }
+
+.booth-item.no-click { cursor: default; }
+.booth-item.no-click:active { transform: none; }
+
+/* People Section in Detail */
+.people-list { display: flex; flex-direction: column; gap: 8px; }
+.person-card { background: var(--bg); padding: 10px 12px; border-radius: 8px; }
+.person-name { font-weight: 500; font-size: 14px; }
+.person-title { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state i { font-size: 48px; margin-bottom: 16px; }
 .empty-state p { margin-bottom: 12px; }

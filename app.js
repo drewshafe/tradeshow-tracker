@@ -204,7 +204,10 @@ function renderShowTabs() {
     <button class="tab active" data-tab="reps">Reps</button>
     <button class="tab" data-tab="master">Master</button>
     <button class="tab" data-tab="customers">Customers</button>
-    <button class="tab" data-tab="opps">Current Opps</button>
+    <button class="tab" data-tab="working">Working</button>
+    <button class="tab" data-tab="opps">Opps</button>
+    <button class="tab" data-tab="inactive">Inactive</button>
+    <button class="tab" data-tab="people">People</button>
     <button class="tab" data-tab="dashboard">Dashboard</button>
   `;
   
@@ -219,9 +222,23 @@ function renderShowTabs() {
         renderRepList();
       } else if (tab === 'dashboard') {
         await showDashboard();
+      } else if (tab === 'people') {
+        currentRepId = null;
+        currentListType = LIST_TYPES.PEOPLE;
+        await loadPeopleList();
+        hideAllViews();
+        document.getElementById('list-view').classList.add('active');
+        updateListTitle();
       } else {
         currentRepId = null;
-        currentListType = tab === 'master' ? LIST_TYPES.MASTER : tab === 'customers' ? LIST_TYPES.CUSTOMERS : LIST_TYPES.CURRENT_OPPS;
+        const typeMap = {
+          'master': LIST_TYPES.MASTER,
+          'customers': LIST_TYPES.CUSTOMERS,
+          'working': LIST_TYPES.WORKING,
+          'opps': LIST_TYPES.OPPS,
+          'inactive': LIST_TYPES.INACTIVE_CUSTOMERS
+        };
+        currentListType = typeMap[tab];
         await loadBoothList();
         hideAllViews();
         document.getElementById('list-view').classList.add('active');
@@ -253,9 +270,56 @@ function renderRepList() {
 
 // ============ BOOTH LIST ============
 
+let people = []; // For people list
+
 async function loadBoothList() {
-  booths = await getBooths(currentShowId, currentRepId, currentListType);
+  const config = LIST_CONFIG[currentListType];
+  
+  if (currentListType === LIST_TYPES.HIT_LIST && currentRepId) {
+    // Hit list includes tagged Working/Opps
+    booths = await getHitListWithTags(currentShowId, currentRepId);
+  } else {
+    booths = await getBooths(currentShowId, null, currentListType);
+  }
   renderBoothList();
+}
+
+async function loadPeopleList() {
+  people = await getPeople(currentShowId);
+  renderPeopleList();
+}
+
+function renderPeopleList() {
+  const list = document.getElementById('booth-list');
+  document.getElementById('stat-showing').textContent = people.length;
+  document.getElementById('stat-tovisit').textContent = '-';
+  document.getElementById('stat-followup').textContent = '-';
+  document.getElementById('stat-demos').textContent = '-';
+  
+  if (people.length === 0) {
+    list.innerHTML = `<div class="empty-state"><i class="fas fa-users"></i><p>No people imported</p><button class="btn primary" id="import-people-btn">Import People</button></div>`;
+    document.getElementById('import-people-btn')?.addEventListener('click', showAdminModal);
+    return;
+  }
+  
+  list.innerHTML = `
+    <div class="grid-view">
+      <div class="grid-header">
+        <span>Name</span>
+        <span>Title</span>
+        <span>Company</span>
+        <span>Domain</span>
+      </div>
+      ${people.map(p => `
+        <div class="grid-row">
+          <span class="primary">${p.firstName || ''} ${p.lastName || ''}</span>
+          <span>${p.jobTitle || ''}</span>
+          <span>${p.companyName || ''}</span>
+          <span class="domain">${p.domain || ''}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function getFilteredBooths() {
@@ -299,9 +363,10 @@ function getFilteredBooths() {
 function renderBoothList() {
   const filtered = getFilteredBooths();
   const list = document.getElementById('booth-list');
+  const config = LIST_CONFIG[currentListType] || {};
   
   document.getElementById('stat-showing').textContent = filtered.length;
-  document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED).length;
+  document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED || !b.status).length;
   document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP).length;
   document.getElementById('stat-demos').textContent = booths.filter(b => b.status === STATUS.DEMO_BOOKED).length;
 
@@ -314,29 +379,82 @@ function renderBoothList() {
     return;
   }
 
-  list.innerHTML = filtered.map(b => `
-    <div class="booth-item" data-booth-id="${b.id}">
+  // Grid view for Master, Customer, Working, Opps, People
+  if (config.isGrid) {
+    list.innerHTML = `
+      <div class="grid-view">
+        <div class="grid-header">
+          <span>Booth</span>
+          <span>Company</span>
+          <span>Sales</span>
+          <span>Platform</span>
+          ${config.showRep ? '<span>Owner</span>' : ''}
+        </div>
+        ${filtered.map(b => `
+          <div class="grid-row">
+            <span class="booth-num">${b.boothNumber || '-'}</span>
+            <span class="primary">${b.companyName || 'Unknown'}</span>
+            <span class="sales">${formatCurrency(b.estimatedMonthlySales)}</span>
+            <span>${b.platform || ''}</span>
+            ${config.showRep ? `<span class="owner">${getOwnerName(b.ownerId)}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+    return;
+  }
+
+  // Detail view for Hit List and Inactive Customers
+  list.innerHTML = filtered.map(b => {
+    const tag = b.tag ? `<span class="item-tag ${b.tag.toLowerCase()}">${b.tag}</span>` : '';
+    const claimedTag = b.claimedBy ? `<span class="item-tag claimed">Claimed: ${reps.find(r => r.id === b.claimedBy)?.name || b.claimedBy}</span>` : '';
+    const ownerDisplay = config.showRep && b.ownerId ? `<span class="owner-badge">${getOwnerName(b.ownerId)}</span>` : '';
+    
+    return `
+    <div class="booth-item ${config.hasDetail ? '' : 'no-click'}" data-booth-id="${b.id}">
       <div class="booth-left">
         <div class="status-dot ${b.status || 'not_visited'}"></div>
         <span class="booth-number">${b.boothNumber || '-'}</span>
       </div>
       <div class="booth-center">
-        <div class="company-name">${b.companyName || 'Unknown'}</div>
+        <div class="company-row">
+          <span class="company-name">${b.companyName || 'Unknown'}</span>
+          ${tag}${claimedTag}
+        </div>
         <div class="booth-meta">
           ${b.platform || ''}
           ${b.protection ? `<span class="competitor"> • ${b.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
+          ${ownerDisplay}
         </div>
       </div>
       <div class="booth-right">
         <span class="sales-value">${formatCurrency(b.estimatedMonthlySales)}</span>
-        <i class="fas fa-chevron-right"></i>
+        ${config.hasDetail ? '<i class="fas fa-chevron-right"></i>' : ''}
+        ${config.canClaim && !b.claimedBy ? `<button class="claim-btn" data-booth-id="${b.id}">Claim</button>` : ''}
       </div>
     </div>
-  `).join('');
+  `}).join('');
   
-  list.querySelectorAll('.booth-item').forEach(item => {
-    item.addEventListener('click', () => showDetailView(item.dataset.boothId));
-  });
+  // Attach click handlers
+  if (config.hasDetail) {
+    list.querySelectorAll('.booth-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('claim-btn')) {
+          showDetailView(item.dataset.boothId);
+        }
+      });
+    });
+  }
+  
+  // Attach claim handlers
+  if (config.canClaim) {
+    list.querySelectorAll('.claim-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await handleClaimLead(btn.dataset.boothId);
+      });
+    });
+  }
 }
 
 function formatCurrency(val) {
@@ -384,6 +502,23 @@ function renderActiveFilters() {
   }
 }
 
+async function handleClaimLead(boothId) {
+  // Show rep selector
+  const repNames = reps.map(r => r.name).join(', ');
+  const repName = prompt(`Claim this lead for which rep?\n(${repNames})`);
+  if (!repName) return;
+  
+  const rep = reps.find(r => r.name.toLowerCase() === repName.toLowerCase());
+  if (!rep) {
+    alert('Rep not found. Please enter: ' + repNames);
+    return;
+  }
+  
+  await claimLead(boothId, rep.id, currentShowId);
+  await loadBoothList();
+  alert(`Lead claimed for ${rep.name} and added to their Hit List`);
+}
+
 function clearSearch() {
   searchQuery = '';
   document.getElementById('search-input').value = '';
@@ -393,10 +528,13 @@ function clearSearch() {
 
 // ============ DETAIL VIEW ============
 
-function showDetailView(id) {
+async function showDetailView(id) {
   currentBoothId = id;
   const booth = booths.find(b => b.id === id);
   if (!booth) return;
+
+  // Get people for this company domain
+  const companyPeople = booth.domain ? await getPeopleByDomain(currentShowId, booth.domain) : [];
 
   document.getElementById('detail-company').textContent = booth.companyName || 'Unknown';
   
@@ -413,7 +551,22 @@ function showDetailView(id) {
         ${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
         ${booth.returns ? ` • Returns: ${booth.returns}` : ''}
       </div>
+      ${booth.tag ? `<span class="detail-tag ${booth.tag.toLowerCase()}">${booth.tag}</span>` : ''}
     </div>
+
+    ${companyPeople.length > 0 ? `
+    <div class="section">
+      <div class="section-title">People at ${booth.companyName}</div>
+      <div class="people-list">
+        ${companyPeople.map(p => `
+          <div class="person-card">
+            <div class="person-name">${p.firstName || ''} ${p.lastName || ''}</div>
+            <div class="person-title">${p.jobTitle || ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
 
     <div class="section">
       <div class="section-title">Status</div>
@@ -763,19 +916,24 @@ function showAdminTab(tab) {
         <label>Select Show</label>
         <select id="import-show" class="input">${shows.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
         
-        <label>Select Rep (for Hit List)</label>
-        <select id="import-rep" class="input">
-          <option value="">-- None (Master/Customers/Opps) --</option>
-          ${reps.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-        </select>
-        
         <label>List Type</label>
         <select id="import-list-type" class="input">
           <option value="${LIST_TYPES.HIT_LIST}">Hit List</option>
           <option value="${LIST_TYPES.MASTER}">Master</option>
           <option value="${LIST_TYPES.CUSTOMERS}">Customers</option>
-          <option value="${LIST_TYPES.CURRENT_OPPS}">Current Opps</option>
+          <option value="${LIST_TYPES.WORKING}">Working</option>
+          <option value="${LIST_TYPES.OPPS}">Opps</option>
+          <option value="${LIST_TYPES.INACTIVE_CUSTOMERS}">Inactive Customers</option>
+          <option value="${LIST_TYPES.PEOPLE}">People</option>
         </select>
+        
+        <div id="rep-select-row">
+          <label>Select Rep (for Hit List only)</label>
+          <select id="import-rep" class="input">
+            <option value="">-- No Rep --</option>
+            ${reps.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+          </select>
+        </div>
         
         <label>Upload CSV File</label>
         <input type="file" id="import-file" class="input" accept=".csv,.tsv,.txt">
@@ -787,6 +945,14 @@ function showAdminTab(tab) {
         <button class="btn primary full" id="import-paste-btn"><i class="fas fa-paste"></i> Import Data</button>
       </div>
     `;
+    
+    // Show/hide rep select based on list type
+    const listTypeSelect = document.getElementById('import-list-type');
+    const repRow = document.getElementById('rep-select-row');
+    listTypeSelect.addEventListener('change', () => {
+      repRow.style.display = listTypeSelect.value === LIST_TYPES.HIT_LIST ? 'block' : 'none';
+    });
+    
     document.getElementById('import-file').addEventListener('change', importFromFile);
     document.getElementById('import-paste-btn').addEventListener('click', importFromPaste);
   }
@@ -874,23 +1040,40 @@ function processImportData(text) {
 
 function showMapperModal() {
   const { headers } = pendingImportData;
+  const listType = document.getElementById('import-list-type').value;
+  const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
   
   // Auto-detect mappings
   columnMapping = {};
-  const headerLower = headers.map(h => h.toLowerCase());
+  const headerLower = headers.map(h => h.toLowerCase().trim());
   
-  REQUIRED_FIELDS.forEach(field => {
-    const patterns = {
-      companyName: ['company name', 'company', 'name', 'merchant'],
-      boothNumber: ['booth', 'booth#', 'booth number', 'booth #'],
-      domain: ['domain', 'website', 'url', 'company domain'],
-      estimatedMonthlySales: ['est monthly sales', 'estimated monthly sales', 'monthly sales', 'revenue', 'gmv'],
-      platform: ['platform', 'ecommerce platform', 'cart'],
-      protection: ['protection', 'competitor', 'competitor tracking', 'shipping protection'],
-      returns: ['returns', 'return provider', 'returns provider']
-    };
+  fields.forEach(field => {
+    // Try to match field label to header
+    const labelLower = field.label.toLowerCase();
+    let found = headerLower.findIndex(h => h === labelLower || h.includes(labelLower) || labelLower.includes(h));
     
-    const found = headerLower.findIndex(h => patterns[field.key]?.some(p => h.includes(p)));
+    // Try common variations
+    if (found < 0) {
+      const variations = {
+        companyName: ['company name', 'company', 'name', 'merchant'],
+        boothNumber: ['booth', 'booth#', 'booth number', 'booth #'],
+        domain: ['domain', 'website', 'url', 'company domain', 'company domain name'],
+        estimatedMonthlySales: ['est monthly sales', 'estimated monthly sales', 'monthly sales', 'revenue', 'gmv', 'sales'],
+        platform: ['platform', 'ecommerce platform', 'cart'],
+        ownerId: ['company owner', 'owner', 'hubspot owner', 'owner id'],
+        firstName: ['first name', 'first', 'fname'],
+        lastName: ['last name', 'last', 'lname'],
+        jobTitle: ['job title', 'title', 'position', 'role'],
+        lastContacted: ['last contacted', 'last contact', 'last activity'],
+        recordId: ['record id', 'record_id', 'id', 'hubspot id'],
+        competitorInstalls: ['competitor tracking - installs', 'competitor installs', 'protection installs'],
+        competitorUninstalls: ['competitor tracking - uninstalls', 'competitor uninstalls', 'protection uninstalls'],
+      };
+      
+      const patterns = variations[field.key] || [];
+      found = headerLower.findIndex(h => patterns.some(p => h.includes(p) || p.includes(h)));
+    }
+    
     if (found >= 0) columnMapping[field.key] = found;
   });
   
@@ -900,12 +1083,14 @@ function showMapperModal() {
 
 function renderMapperContent() {
   const { headers } = pendingImportData;
+  const listType = document.getElementById('import-list-type').value;
+  const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
   const container = document.getElementById('mapper-content');
   
   container.innerHTML = `
-    <p class="hint">Map your columns to the required fields:</p>
+    <p class="hint">Map your columns to the required fields for <strong>${LIST_LABELS[listType]}</strong>:</p>
     <div class="mapper-grid">
-      ${REQUIRED_FIELDS.map(field => `
+      ${fields.map(field => `
         <div class="mapper-row">
           <label>${field.label}${field.required ? ' *' : ''}</label>
           <select class="input" data-field="${field.key}">
@@ -931,28 +1116,95 @@ function hideMapperModal() {
 }
 
 async function confirmMapping() {
-  if (columnMapping.companyName === undefined) return alert('Company Name is required');
+  const listType = document.getElementById('import-list-type').value;
+  const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
+  
+  // Check required fields
+  const requiredFields = fields.filter(f => f.required);
+  for (const field of requiredFields) {
+    if (columnMapping[field.key] === undefined) {
+      return alert(`${field.label} is required`);
+    }
+  }
   
   const showId = document.getElementById('import-show').value;
-  const repId = document.getElementById('import-rep').value || null;
-  const listType = document.getElementById('import-list-type').value;
+  const repId = listType === LIST_TYPES.HIT_LIST ? (document.getElementById('import-rep').value || null) : null;
   
   const { lines } = pendingImportData;
+  
+  // Handle People list separately
+  if (listType === LIST_TYPES.PEOPLE) {
+    const newPeople = [];
+    for (const vals of lines) {
+      const person = {
+        id: `${showId}_person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        showId,
+        firstName: columnMapping.firstName !== undefined ? vals[columnMapping.firstName] || '' : '',
+        lastName: columnMapping.lastName !== undefined ? vals[columnMapping.lastName] || '' : '',
+        jobTitle: columnMapping.jobTitle !== undefined ? vals[columnMapping.jobTitle] || '' : '',
+        companyName: columnMapping.companyName !== undefined ? vals[columnMapping.companyName] || '' : '',
+        domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] || '' : '',
+        sales: columnMapping.sales !== undefined ? vals[columnMapping.sales] || '' : '',
+        dateCompleted: columnMapping.dateCompleted !== undefined ? vals[columnMapping.dateCompleted] || '' : ''
+      };
+      
+      if (person.firstName || person.lastName) newPeople.push(person);
+    }
+    
+    if (newPeople.length === 0) return alert('No valid data found');
+    
+    await deletePeopleForShow(showId);
+    await savePeople(newPeople);
+    
+    hideMapperModal();
+    hideAdminModal();
+    alert(`Imported ${newPeople.length} people`);
+    return;
+  }
+  
+  // Handle booth-based lists
   const newBooths = [];
   
   for (const vals of lines) {
+    const getValue = (key) => columnMapping[key] !== undefined ? (vals[columnMapping[key]] || '') : '';
+    const getNumeric = (key) => {
+      const val = getValue(key);
+      return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
+    };
+    
     const booth = {
       id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      showId, repId, listType,
-      companyName: vals[columnMapping.companyName] || '',
-      boothNumber: columnMapping.boothNumber !== undefined ? vals[columnMapping.boothNumber] || '' : '',
-      domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] || '' : '',
-      estimatedMonthlySales: columnMapping.estimatedMonthlySales !== undefined ? parseFloat((vals[columnMapping.estimatedMonthlySales] || '0').replace(/[$,]/g, '')) || 0 : 0,
-      platform: columnMapping.platform !== undefined ? vals[columnMapping.platform] || '' : '',
-      protection: columnMapping.protection !== undefined ? vals[columnMapping.protection] || '' : '',
-      returns: columnMapping.returns !== undefined ? vals[columnMapping.returns] || '' : '',
+      showId,
+      repId,
+      listType,
+      companyName: getValue('companyName'),
+      boothNumber: getValue('boothNumber'),
+      domain: getValue('domain'),
+      estimatedMonthlySales: getNumeric('estimatedMonthlySales'),
+      platform: getValue('platform'),
+      protection: getValue('protection'),
+      returns: getValue('returns'),
       status: STATUS.NOT_VISITED,
-      notes: '', contactName: '', ordersPerMonth: 'N/A', aov: 'N/A', businessCardData: null
+      notes: '',
+      contactName: '',
+      ordersPerMonth: 'N/A',
+      aov: 'N/A',
+      businessCardData: null,
+      // Extended fields
+      recordId: getValue('recordId'),
+      ownerId: getValue('ownerId'),
+      lastContacted: getValue('lastContacted'),
+      campaign: getValue('campaign'),
+      competitorInstalls: getValue('competitorInstalls'),
+      competitorUninstalls: getValue('competitorUninstalls'),
+      techInstalls: getValue('techInstalls'),
+      instagramFollowers: getNumeric('instagramFollowers'),
+      facebookFollowers: getNumeric('facebookFollowers'),
+      monthlyVisits: getNumeric('monthlyVisits'),
+      associatedDeal: getValue('associatedDeal'),
+      associatedDealIds: getValue('associatedDealIds'),
+      dealRecordId: getValue('dealRecordId'),
+      dealName: getValue('dealName')
     };
     
     if (booth.companyName) newBooths.push(booth);
