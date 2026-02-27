@@ -234,13 +234,18 @@ const CSV_FIELDS = {
     { key: 'dateCompleted', label: 'Date Completed', required: false }
   ],
   [LIST_TYPES.HIT_LIST]: [
+    { key: 'recordId', label: 'Record ID', required: false },
     { key: 'companyName', label: 'Company Name', required: true },
-    { key: 'boothNumber', label: 'Booth Number', required: false },
-    { key: 'domain', label: 'Domain', required: false },
-    { key: 'estimatedMonthlySales', label: 'Est. Monthly Sales', required: false },
-    { key: 'platform', label: 'Platform', required: false },
-    { key: 'protection', label: 'Protection', required: false },
-    { key: 'returns', label: 'Returns', required: false }
+    { key: 'domain', label: 'Company Domain Name', required: false },
+    { key: 'boothNumber', label: 'Booth#', required: false },
+    { key: 'estimatedMonthlySales', label: 'Estimated Monthly Sales', required: false },
+    { key: 'platform', label: 'Ecommerce Platform', required: false },
+    { key: 'competitorInstalls', label: 'Competitor Tracking - Installs', required: false },
+    { key: 'competitorUninstalls', label: 'Competitor Tracking - Uninstalls', required: false },
+    { key: 'techInstalls', label: 'Tech Tracking - Installs', required: false },
+    { key: 'instagramFollowers', label: 'Instagram Followers', required: false },
+    { key: 'facebookFollowers', label: 'Facebook Followers', required: false },
+    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false }
   ]
 };
 
