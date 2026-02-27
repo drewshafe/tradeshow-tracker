@@ -38,6 +38,24 @@ function setupEventListeners() {
   document.getElementById('back-from-dashboard-btn').addEventListener('click', goToRepSelect);
   document.getElementById('export-btn').addEventListener('click', exportDashboard);
   
+  // Filter modal
+  document.getElementById('filter-btn').addEventListener('click', showFilterModal);
+  document.getElementById('close-filter-btn').addEventListener('click', hideFilterModal);
+  document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
+  document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
+  
+  // Admin modal
+  document.getElementById('close-admin-btn').addEventListener('click', hideAdminModal);
+  
+  // Mapper modal
+  document.getElementById('close-mapper-btn').addEventListener('click', hideMapperModal);
+  document.getElementById('cancel-mapper-btn').addEventListener('click', hideMapperModal);
+  document.getElementById('confirm-mapper-btn').addEventListener('click', confirmMapping);
+  
+  // Camera modal
+  document.getElementById('close-camera-btn').addEventListener('click', closeCameraModal);
+  document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+  
   // Search
   document.getElementById('search-input').addEventListener('input', (e) => {
     searchQuery = e.target.value;
@@ -55,24 +73,6 @@ function setupEventListeners() {
       renderBoothList();
     });
   });
-  
-  // Filter modal
-  document.getElementById('filter-btn').addEventListener('click', showFilterModal);
-  document.getElementById('close-filter-btn').addEventListener('click', hideFilterModal);
-  document.getElementById('clear-filters-btn').addEventListener('click', () => { clearFilters(); hideFilterModal(); });
-  document.getElementById('apply-filters-btn').addEventListener('click', () => { applyFilters(); hideFilterModal(); });
-  
-  // Admin modal
-  document.getElementById('close-admin-btn').addEventListener('click', hideAdminModal);
-  
-  // Mapper modal
-  document.getElementById('close-mapper-btn').addEventListener('click', hideMapperModal);
-  document.getElementById('cancel-mapper-btn').addEventListener('click', hideMapperModal);
-  document.getElementById('confirm-mapper-btn').addEventListener('click', confirmMapping);
-  
-  // Camera modal
-  document.getElementById('close-camera-btn').addEventListener('click', closeCameraModal);
-  document.getElementById('capture-btn').addEventListener('click', capturePhoto);
 }
 
 // ============ NAVIGATION ============
@@ -118,7 +118,6 @@ async function selectRep(repId) {
 
 async function selectListType(listType) {
   currentListType = listType;
-  currentRepId = null;
   await loadBoothList();
   hideAllViews();
   document.getElementById('list-view').classList.add('active');
@@ -146,7 +145,8 @@ function updateListTitle() {
   const rep = reps.find(r => r.id === currentRepId);
   const listLabel = LIST_LABELS[currentListType] || currentListType;
   document.getElementById('list-title').textContent = currentRepId 
-    ? `${rep?.name || 'Rep'} - ${listLabel}` : listLabel;
+    ? `${rep?.name || 'Rep'} - ${listLabel}`
+    : listLabel;
 }
 
 // ============ SHOW LIST ============
@@ -166,12 +166,19 @@ function renderShowList() {
     const dateStr = startDate && endDate 
       ? `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       : '';
-    return `<div class="show-card" data-show-id="${show.id}">
-      <div class="show-info"><h3>${show.name}</h3><p><i class="fas fa-map-marker-alt"></i> ${show.location || ''} ${dateStr ? `&nbsp; <i class="fas fa-calendar"></i> ${dateStr}` : ''}</p></div>
-      <i class="fas fa-chevron-right"></i>
-    </div>`;
+    
+    return `
+      <div class="show-card" data-show-id="${show.id}">
+        <div class="show-info">
+          <h3>${show.name}</h3>
+          <p><i class="fas fa-map-marker-alt"></i> ${show.location || ''} ${dateStr ? `&nbsp; <i class="fas fa-calendar"></i> ${dateStr}` : ''}</p>
+        </div>
+        <i class="fas fa-chevron-right"></i>
+      </div>
+    `;
   }).join('');
   
+  // Attach click handlers
   container.querySelectorAll('.show-card').forEach(card => {
     card.addEventListener('click', () => selectShow(card.dataset.showId));
   });
@@ -194,11 +201,19 @@ function renderShowTabs() {
       container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
       const tab = btn.dataset.tab;
-      if (tab === 'reps') { currentRepId = null; renderRepList(); }
-      else if (tab === 'dashboard') { await showDashboard(); }
-      else {
+      
+      if (tab === 'reps') {
+        currentRepId = null;
+        renderRepList();
+      } else if (tab === 'dashboard') {
+        await showDashboard();
+      } else {
+        currentRepId = null;
         currentListType = tab === 'master' ? LIST_TYPES.MASTER : tab === 'customers' ? LIST_TYPES.CUSTOMERS : LIST_TYPES.CURRENT_OPPS;
-        await selectListType(currentListType);
+        await loadBoothList();
+        hideAllViews();
+        document.getElementById('list-view').classList.add('active');
+        updateListTitle();
       }
     });
   });
@@ -206,13 +221,18 @@ function renderShowTabs() {
 
 function renderRepList() {
   const container = document.getElementById('rep-content');
-  container.innerHTML = `<div class="rep-list">${reps.map(rep => `
-    <div class="rep-card" data-rep-id="${rep.id}">
-      <div class="rep-avatar">${rep.name.charAt(0)}</div>
-      <span>${rep.name}</span>
-      <i class="fas fa-chevron-right"></i>
+  
+  container.innerHTML = `
+    <div class="rep-list">
+      ${reps.map(rep => `
+        <div class="rep-card" data-rep-id="${rep.id}">
+          <div class="rep-avatar">${rep.name.charAt(0)}</div>
+          <span>${rep.name}</span>
+          <i class="fas fa-chevron-right"></i>
+        </div>
+      `).join('')}
     </div>
-  `).join('')}</div>`;
+  `;
   
   container.querySelectorAll('.rep-card').forEach(card => {
     card.addEventListener('click', () => selectRep(card.dataset.repId));
@@ -228,22 +248,34 @@ async function loadBoothList() {
 
 function getFilteredBooths() {
   let result = [...booths];
+
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    result = result.filter(b => (b.companyName || '').toLowerCase().includes(q) || (b.boothNumber || '').toLowerCase().includes(q) || (b.domain || '').toLowerCase().includes(q));
+    result = result.filter(b => 
+      (b.companyName || '').toLowerCase().includes(q) ||
+      (b.boothNumber || '').toLowerCase().includes(q) ||
+      (b.domain || '').toLowerCase().includes(q)
+    );
   }
+
   if (filters.platform !== 'all') {
-    result = filters.platform === '[No Platform]' ? result.filter(b => !b.platform) : result.filter(b => b.platform === filters.platform);
+    if (filters.platform === '[No Platform]') result = result.filter(b => !b.platform);
+    else result = result.filter(b => b.platform === filters.platform);
   }
+
   if (filters.protection !== 'all') {
-    result = filters.protection === '[No Protection]' ? result.filter(b => !b.protection) : result.filter(b => (b.protection || '').toLowerCase().includes(filters.protection.toLowerCase()));
+    if (filters.protection === '[No Protection]') result = result.filter(b => !b.protection);
+    else result = result.filter(b => (b.protection || '').toLowerCase().includes(filters.protection.toLowerCase()));
   }
+
   if (filters.returns !== 'all') {
-    result = filters.returns === '[No Returns]' ? result.filter(b => !b.returns) : result.filter(b => (b.returns || '').toLowerCase().includes(filters.returns.toLowerCase()));
+    if (filters.returns === '[No Returns]') result = result.filter(b => !b.returns);
+    else result = result.filter(b => (b.returns || '').toLowerCase().includes(filters.returns.toLowerCase()));
   }
+
   if (filters.minRevenue > 0) result = result.filter(b => (b.estimatedMonthlySales || 0) >= filters.minRevenue);
   if (filters.status !== 'all') result = result.filter(b => b.status === filters.status);
-  
+
   switch (sortBy) {
     case 'booth': result.sort((a, b) => (parseInt(a.boothNumber) || 99999) - (parseInt(b.boothNumber) || 99999)); break;
     case 'value': result.sort((a, b) => (b.estimatedMonthlySales || 0) - (a.estimatedMonthlySales || 0)); break;
@@ -260,20 +292,33 @@ function renderBoothList() {
   document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED).length;
   document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP).length;
   document.getElementById('stat-demos').textContent = booths.filter(b => b.status === STATUS.DEMO_BOOKED).length;
+
   renderActiveFilters();
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><p>No booths found</p>${booths.length === 0 ? '<button class="btn primary" id="import-empty-btn">Import Data</button>' : '<button class="btn secondary" id="clear-empty-btn">Clear filters</button>'}</div>`;
+    list.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><p>No booths found</p>${booths.length === 0 ? '<button class="btn primary" id="import-empty-btn">Import Data</button>' : '<button class="btn secondary" id="clear-filters-empty-btn">Clear filters</button>'}</div>`;
     document.getElementById('import-empty-btn')?.addEventListener('click', showAdminModal);
-    document.getElementById('clear-empty-btn')?.addEventListener('click', clearFilters);
+    document.getElementById('clear-filters-empty-btn')?.addEventListener('click', clearFilters);
     return;
   }
 
   list.innerHTML = filtered.map(b => `
     <div class="booth-item" data-booth-id="${b.id}">
-      <div class="booth-left"><div class="status-dot ${b.status || 'not_visited'}"></div><span class="booth-number">${b.boothNumber || '-'}</span></div>
-      <div class="booth-center"><div class="company-name">${b.companyName || 'Unknown'}</div><div class="booth-meta">${b.platform || ''}${b.protection ? `<span class="competitor"> • ${b.protection}</span>` : '<span class="no-protection"> • No protection</span>'}</div></div>
-      <div class="booth-right"><span class="sales-value">${formatCurrency(b.estimatedMonthlySales)}</span><i class="fas fa-chevron-right"></i></div>
+      <div class="booth-left">
+        <div class="status-dot ${b.status || 'not_visited'}"></div>
+        <span class="booth-number">${b.boothNumber || '-'}</span>
+      </div>
+      <div class="booth-center">
+        <div class="company-name">${b.companyName || 'Unknown'}</div>
+        <div class="booth-meta">
+          ${b.platform || ''}
+          ${b.protection ? `<span class="competitor"> • ${b.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
+        </div>
+      </div>
+      <div class="booth-right">
+        <span class="sales-value">${formatCurrency(b.estimatedMonthlySales)}</span>
+        <i class="fas fa-chevron-right"></i>
+      </div>
     </div>
   `).join('');
   
@@ -292,24 +337,38 @@ function formatCurrency(val) {
 function renderActiveFilters() {
   const container = document.getElementById('active-filters');
   const badge = document.getElementById('filter-badge');
-  const btn = document.querySelector('.filter-btn');
-  let count = 0, chips = [];
+  const btn = document.getElementById('filter-btn');
   
-  if (filters.platform !== 'all') { count++; chips.push({ label: filters.platform, clear: () => { filters.platform = 'all'; renderBoothList(); } }); }
-  if (filters.protection !== 'all') { count++; chips.push({ label: filters.protection, clear: () => { filters.protection = 'all'; renderBoothList(); } }); }
-  if (filters.returns !== 'all') { count++; chips.push({ label: filters.returns, clear: () => { filters.returns = 'all'; renderBoothList(); } }); }
-  if (filters.minRevenue > 0) { count++; chips.push({ label: `≥ ${formatCurrency(filters.minRevenue)}`, clear: () => { filters.minRevenue = 0; renderBoothList(); } }); }
-  if (filters.status !== 'all') { count++; chips.push({ label: STATUS_LABELS[filters.status], clear: () => { filters.status = 'all'; renderBoothList(); } }); }
+  let count = 0;
+  let chips = [];
+
+  if (filters.platform !== 'all') { count++; chips.push({ key: 'platform', label: filters.platform }); }
+  if (filters.protection !== 'all') { count++; chips.push({ key: 'protection', label: filters.protection }); }
+  if (filters.returns !== 'all') { count++; chips.push({ key: 'returns', label: filters.returns }); }
+  if (filters.minRevenue > 0) { count++; chips.push({ key: 'minRevenue', label: `≥ ${formatCurrency(filters.minRevenue)}` }); }
+  if (filters.status !== 'all') { count++; chips.push({ key: 'status', label: STATUS_LABELS[filters.status] }); }
 
   if (count > 0) {
-    container.innerHTML = chips.map((c, i) => `<button class="filter-chip" data-idx="${i}">${c.label} <i class="fas fa-times"></i></button>`).join('') + '<button class="clear-all-btn" id="clear-all-chips">Clear All</button>';
+    container.innerHTML = chips.map(c => `<button class="filter-chip" data-filter="${c.key}">${c.label} <i class="fas fa-times"></i></button>`).join('') +
+      '<button class="clear-all-btn" id="clear-all-filters-btn">Clear All</button>';
     container.classList.remove('hidden');
-    badge.textContent = count; badge.classList.remove('hidden');
+    badge.textContent = count;
+    badge.classList.remove('hidden');
     btn.classList.add('active');
-    chips.forEach((c, i) => container.querySelector(`[data-idx="${i}"]`).addEventListener('click', c.clear));
-    document.getElementById('clear-all-chips').addEventListener('click', clearFilters);
+    
+    container.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const key = chip.dataset.filter;
+        if (key === 'minRevenue') filters[key] = 0;
+        else filters[key] = 'all';
+        renderBoothList();
+      });
+    });
+    document.getElementById('clear-all-filters-btn')?.addEventListener('click', clearFilters);
   } else {
-    container.classList.add('hidden'); badge.classList.add('hidden'); btn.classList.remove('active');
+    container.classList.add('hidden');
+    badge.classList.add('hidden');
+    btn.classList.remove('active');
   }
 }
 
@@ -328,20 +387,34 @@ function showDetailView(id) {
   if (!booth) return;
 
   document.getElementById('detail-company').textContent = booth.companyName || 'Unknown';
-  const content = document.getElementById('detail-content');
   
+  const content = document.getElementById('detail-content');
   content.innerHTML = `
     <div class="detail-header">
-      <div class="detail-header-row"><span class="booth-badge">Booth ${booth.boothNumber || '-'}</span><span class="detail-sales">${formatCurrency(booth.estimatedMonthlySales)}/mo</span></div>
+      <div class="detail-header-row">
+        <span class="booth-badge">Booth ${booth.boothNumber || '-'}</span>
+        <span class="detail-sales">${formatCurrency(booth.estimatedMonthlySales)}/mo</span>
+      </div>
       <div class="detail-domain">${booth.domain || ''}</div>
-      <div class="detail-meta">${booth.platform || 'No platform'}${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}${booth.returns ? ` • Returns: ${booth.returns}` : ''}</div>
+      <div class="detail-meta">
+        ${booth.platform || 'No platform'}
+        ${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
+        ${booth.returns ? ` • Returns: ${booth.returns}` : ''}
+      </div>
     </div>
+
     <div class="section">
       <div class="section-title">Status</div>
       <div class="status-buttons">
-        ${Object.entries(STATUS).map(([key, val]) => `<button class="status-btn ${val} ${booth.status === val ? 'active' : ''}" data-status="${val}"><i class="fas fa-${val === 'not_visited' ? 'circle' : val === 'follow_up' ? 'clock' : val === 'demo_booked' ? 'calendar' : 'times-circle'}"></i>${STATUS_LABELS[val]}</button>`).join('')}
+        ${Object.entries(STATUS).map(([key, val]) => `
+          <button class="status-btn ${val} ${booth.status === val ? 'active' : ''}" data-status="${val}">
+            <i class="fas fa-${val === 'not_visited' ? 'circle' : val === 'follow_up' ? 'clock' : val === 'demo_booked' ? 'calendar' : 'times-circle'}"></i>
+            ${STATUS_LABELS[val]}
+          </button>
+        `).join('')}
       </div>
     </div>
+
     <div class="section">
       <div class="section-title">Contact Info</div>
       <input type="text" class="input" id="contact-name" placeholder="Contact name..." value="${booth.contactName || ''}">
@@ -349,39 +422,56 @@ function showDetailView(id) {
         <button class="picker-btn" id="orders-picker-btn"><label>Orders/mo</label><span id="orders-value">${booth.ordersPerMonth || 'N/A'}</span><i class="fas fa-chevron-down"></i></button>
         <button class="picker-btn" id="aov-picker-btn"><label>AOV</label><span id="aov-value">${booth.aov || 'N/A'}</span><i class="fas fa-chevron-down"></i></button>
       </div>
-      <div id="orders-picker" class="options-list hidden">${ORDER_OPTIONS.map(o => `<div class="option-item ${booth.ordersPerMonth === o ? 'active' : ''}" data-val="${o}">${o}</div>`).join('')}</div>
-      <div id="aov-picker" class="options-list hidden">${AOV_OPTIONS.map(o => `<div class="option-item ${booth.aov === o ? 'active' : ''}" data-val="${o}">${o}</div>`).join('')}</div>
+      <div id="orders-picker" class="options-list hidden">${ORDER_OPTIONS.map(o => `<div class="option-item ${booth.ordersPerMonth === o ? 'active' : ''}" data-field="ordersPerMonth" data-value="${o}">${o}</div>`).join('')}</div>
+      <div id="aov-picker" class="options-list hidden">${AOV_OPTIONS.map(o => `<div class="option-item ${booth.aov === o ? 'active' : ''}" data-field="aov" data-value="${o}">${o}</div>`).join('')}</div>
     </div>
+
     <div class="section">
       <div class="section-title">Notes</div>
       <textarea class="input" id="notes-input" placeholder="Tap mic to dictate...">${booth.notes || ''}</textarea>
     </div>
+
     <div class="section">
       <div class="section-title">Business Card</div>
-      <div id="card-container">${booth.businessCardData 
-        ? `<div class="card-preview"><img src="${booth.businessCardData}" alt="Card"><div class="card-actions"><button class="card-action" id="retake-btn"><i class="fas fa-camera"></i> Retake</button><button class="card-action danger" id="remove-card-btn"><i class="fas fa-trash"></i> Remove</button></div></div>`
-        : '<button class="capture-card-btn" id="capture-card-btn"><i class="fas fa-camera"></i> Capture Business Card</button>'}</div>
+      <div id="card-container">
+        ${booth.businessCardData 
+          ? `<div class="card-preview"><img src="${booth.businessCardData}" alt="Card"><div class="card-actions"><button class="card-action" id="retake-card-btn"><i class="fas fa-camera"></i> Retake</button><button class="card-action danger" id="remove-card-btn"><i class="fas fa-trash"></i> Remove</button></div></div>`
+          : `<button class="capture-card-btn" id="capture-card-btn"><i class="fas fa-camera"></i> Capture Business Card</button>`}
+      </div>
     </div>
+
     <div class="section">
       <div class="section-title">Submit to Slack</div>
-      <div class="submit-row"><button class="submit-btn" id="copy-followup-btn"><i class="fas fa-copy"></i> Copy for Follow Up</button><button class="submit-btn demo" id="copy-demo-btn"><i class="fas fa-calendar"></i> Copy for Demo</button></div>
+      <div class="submit-row">
+        <button class="submit-btn" id="copy-followup-btn"><i class="fas fa-copy"></i> Copy for Follow Up</button>
+        <button class="submit-btn demo" id="copy-demo-btn"><i class="fas fa-calendar"></i> Copy for Demo</button>
+      </div>
       <button class="slack-btn" id="open-slack-btn"><i class="fab fa-slack"></i> Open Slack Workflow <i class="fas fa-external-link-alt" style="font-size:12px;opacity:0.6"></i></button>
     </div>
   `;
 
   // Attach event listeners
-  content.querySelectorAll('.status-btn').forEach(btn => btn.addEventListener('click', () => setStatus(btn.dataset.status)));
-  content.querySelector('#contact-name').addEventListener('change', (e) => updateBoothField('contactName', e.target.value));
-  content.querySelector('#notes-input').addEventListener('change', (e) => updateBoothField('notes', e.target.value));
-  content.querySelector('#orders-picker-btn').addEventListener('click', () => togglePicker('orders'));
-  content.querySelector('#aov-picker-btn').addEventListener('click', () => togglePicker('aov'));
-  content.querySelectorAll('#orders-picker .option-item').forEach(opt => opt.addEventListener('click', () => selectOption('ordersPerMonth', opt.dataset.val, 'orders')));
-  content.querySelectorAll('#aov-picker .option-item').forEach(opt => opt.addEventListener('click', () => selectOption('aov', opt.dataset.val, 'aov')));
-  content.querySelector('#capture-card-btn, #retake-btn')?.addEventListener('click', openCamera);
-  content.querySelector('#remove-card-btn')?.addEventListener('click', removeCard);
-  content.querySelector('#copy-followup-btn').addEventListener('click', copyForFollowUp);
-  content.querySelector('#copy-demo-btn').addEventListener('click', copyForDemo);
-  content.querySelector('#open-slack-btn').addEventListener('click', openSlack);
+  content.querySelectorAll('.status-btn').forEach(btn => {
+    btn.addEventListener('click', () => setStatus(btn.dataset.status));
+  });
+  
+  document.getElementById('contact-name').addEventListener('change', (e) => updateBoothField('contactName', e.target.value));
+  document.getElementById('notes-input').addEventListener('change', (e) => updateBoothField('notes', e.target.value));
+  
+  document.getElementById('orders-picker-btn').addEventListener('click', () => togglePicker('orders'));
+  document.getElementById('aov-picker-btn').addEventListener('click', () => togglePicker('aov'));
+  
+  content.querySelectorAll('.option-item').forEach(item => {
+    item.addEventListener('click', () => selectOption(item.dataset.field, item.dataset.value));
+  });
+  
+  document.getElementById('capture-card-btn')?.addEventListener('click', openCamera);
+  document.getElementById('retake-card-btn')?.addEventListener('click', openCamera);
+  document.getElementById('remove-card-btn')?.addEventListener('click', removeCard);
+  
+  document.getElementById('copy-followup-btn').addEventListener('click', copyForFollowUp);
+  document.getElementById('copy-demo-btn').addEventListener('click', copyForDemo);
+  document.getElementById('open-slack-btn').addEventListener('click', openSlack);
 
   hideAllViews();
   document.getElementById('detail-view').classList.add('active');
@@ -389,12 +479,19 @@ function showDetailView(id) {
 
 async function setStatus(status) {
   const booth = booths.find(b => b.id === currentBoothId);
-  if (booth) { booth.status = status; await saveBooth(booth); showDetailView(currentBoothId); }
+  if (booth) {
+    booth.status = status;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+  }
 }
 
 async function updateBoothField(field, value) {
   const booth = booths.find(b => b.id === currentBoothId);
-  if (booth) { booth[field] = value; await saveBooth(booth); }
+  if (booth) {
+    booth[field] = value;
+    await saveBooth(booth);
+  }
 }
 
 function togglePicker(type) {
@@ -402,16 +499,20 @@ function togglePicker(type) {
   document.getElementById(type === 'orders' ? 'aov-picker' : 'orders-picker').classList.add('hidden');
 }
 
-async function selectOption(field, value, pickerType) {
-  await updateBoothField(field, value);
-  document.getElementById(`${pickerType}-value`).textContent = value;
-  document.getElementById(`${pickerType}-picker`).classList.add('hidden');
+async function selectOption(field, value) {
+  const booth = booths.find(b => b.id === currentBoothId);
+  if (booth) {
+    booth[field] = value;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+  }
 }
 
 function copyForFollowUp() {
   const booth = booths.find(b => b.id === currentBoothId);
   if (!booth) return;
-  navigator.clipboard.writeText([booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n'));
+  const text = [booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(text);
   if (booth.status === STATUS.NOT_VISITED) setStatus(STATUS.FOLLOW_UP);
   alert('Copied for Follow Up workflow');
 }
@@ -419,12 +520,15 @@ function copyForFollowUp() {
 function copyForDemo() {
   const booth = booths.find(b => b.id === currentBoothId);
   if (!booth) return;
-  navigator.clipboard.writeText([booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n'));
+  const text = [booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(text);
   setStatus(STATUS.DEMO_BOOKED);
   alert('Copied for Demo workflow');
 }
 
-function openSlack() { window.location.href = 'slack://channel?team=T05MZUWTJPX&id=C05NH7DQB4K'; }
+function openSlack() {
+  window.location.href = 'slack://channel?team=T05MZUWTJPX&id=C05NH7DQB4K';
+}
 
 // Camera
 async function openCamera() {
@@ -445,58 +549,91 @@ async function capturePhoto() {
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  await updateBoothField('businessCardData', canvas.toDataURL('image/jpeg', 0.7));
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  await updateBoothField('businessCardData', dataUrl);
   closeCameraModal();
   showDetailView(currentBoothId);
 }
 
-async function removeCard() { await updateBoothField('businessCardData', null); showDetailView(currentBoothId); }
+async function removeCard() {
+  await updateBoothField('businessCardData', null);
+  showDetailView(currentBoothId);
+}
 
 // ============ FILTERS ============
 
-function showFilterModal() { tempFilters = { ...filters }; renderFilterOptions(); document.getElementById('filter-modal').classList.remove('hidden'); }
-function hideFilterModal() { document.getElementById('filter-modal').classList.add('hidden'); }
+function showFilterModal() {
+  tempFilters = { ...filters };
+  renderFilterOptions();
+  document.getElementById('filter-modal').classList.remove('hidden');
+}
+
+function hideFilterModal() {
+  document.getElementById('filter-modal').classList.add('hidden');
+}
 
 function renderFilterOptions() {
   const container = document.getElementById('filter-options');
   container.innerHTML = `
-    <div class="filter-section"><div class="filter-section-title">Platform</div><div class="filter-options" id="platform-options"></div></div>
-    <div class="filter-section"><div class="filter-section-title">Protection</div><div class="filter-options" id="protection-options"></div></div>
-    <div class="filter-section"><div class="filter-section-title">Returns</div><div class="filter-options" id="returns-options"></div></div>
-    <div class="filter-section"><div class="filter-section-title">Min Revenue</div><div class="filter-options" id="revenue-options"></div></div>
-    <div class="filter-section"><div class="filter-section-title">Status</div><div class="filter-options" id="status-options"></div></div>
+    <div class="filter-section">
+      <div class="filter-section-title">Platform</div>
+      <div class="filter-options">
+        <button class="filter-option ${tempFilters.platform === 'all' ? 'active' : ''}" data-filter="platform" data-value="all">All</button>
+        ${PLATFORMS.map(p => `<button class="filter-option ${tempFilters.platform === p ? 'active' : ''}" data-filter="platform" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Protection</div>
+      <div class="filter-options">
+        <button class="filter-option ${tempFilters.protection === 'all' ? 'active' : ''}" data-filter="protection" data-value="all">All</button>
+        ${PROTECTION_PROVIDERS.map(p => `<button class="filter-option ${tempFilters.protection === p ? 'active' : ''}" data-filter="protection" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Returns</div>
+      <div class="filter-options">
+        <button class="filter-option ${tempFilters.returns === 'all' ? 'active' : ''}" data-filter="returns" data-value="all">All</button>
+        ${RETURNS_PROVIDERS.map(p => `<button class="filter-option ${tempFilters.returns === p ? 'active' : ''}" data-filter="returns" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Min Revenue</div>
+      <div class="filter-options">
+        ${REVENUE_THRESHOLDS.map(t => `<button class="filter-option ${tempFilters.minRevenue === t ? 'active' : ''}" data-filter="minRevenue" data-value="${t}">${t === 0 ? 'Any' : '≥ ' + formatCurrency(t)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Status</div>
+      <div class="filter-options">
+        <button class="filter-option ${tempFilters.status === 'all' ? 'active' : ''}" data-filter="status" data-value="all">All</button>
+        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${tempFilters.status === v ? 'active' : ''}" data-filter="status" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
+      </div>
+    </div>
   `;
   
-  const addOptions = (containerId, options, filterKey, allLabel = 'All') => {
-    const c = document.getElementById(containerId);
-    c.innerHTML = `<button class="filter-option ${tempFilters[filterKey] === 'all' ? 'active' : ''}" data-val="all">${allLabel}</button>` +
-      options.map(o => `<button class="filter-option ${tempFilters[filterKey] === o ? 'active' : ''}" data-val="${o}">${typeof o === 'number' ? (o === 0 ? 'Any' : '≥ ' + formatCurrency(o)) : o}</button>`).join('');
-    c.querySelectorAll('.filter-option').forEach(btn => btn.addEventListener('click', () => {
-      tempFilters[filterKey] = btn.dataset.val === 'all' ? 'all' : (typeof options[0] === 'number' ? parseInt(btn.dataset.val) : btn.dataset.val);
+  container.querySelectorAll('.filter-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.filter;
+      const value = btn.dataset.value;
+      tempFilters[key] = key === 'minRevenue' ? parseInt(value) : value;
       renderFilterOptions();
-    }));
-  };
-  
-  addOptions('platform-options', PLATFORMS, 'platform');
-  addOptions('protection-options', PROTECTION_PROVIDERS, 'protection');
-  addOptions('returns-options', RETURNS_PROVIDERS, 'returns');
-  addOptions('revenue-options', REVENUE_THRESHOLDS, 'minRevenue');
-  
-  const statusC = document.getElementById('status-options');
-  statusC.innerHTML = `<button class="filter-option ${tempFilters.status === 'all' ? 'active' : ''}" data-val="all">All</button>` +
-    Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${tempFilters.status === v ? 'active' : ''}" data-val="${v}">${STATUS_LABELS[v]}</button>`).join('');
-  statusC.querySelectorAll('.filter-option').forEach(btn => btn.addEventListener('click', () => { tempFilters.status = btn.dataset.val; renderFilterOptions(); }));
+    });
+  });
 }
 
-function applyFilters() { filters = { ...tempFilters }; renderBoothList(); }
-function clearFilters() { filters = { platform: 'all', protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters }; renderBoothList(); }
+function applyFilters() { filters = { ...tempFilters }; hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { platform: 'all', protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters }; hideFilterModal(); renderBoothList(); }
 
 // ============ DASHBOARD ============
 
 async function renderDashboard() {
   const stats = await getDashboardStats(currentShowId);
   const container = document.getElementById('dashboard-content');
-  const totals = stats.reduce((acc, s) => ({ toVisit: acc.toVisit + s.toVisit, followUp: acc.followUp + s.followUp, demos: acc.demos + s.demos, dq: acc.dq + s.dq, total: acc.total + s.total }), { toVisit: 0, followUp: 0, demos: 0, dq: 0, total: 0 });
+  
+  const totals = stats.reduce((acc, s) => ({
+    toVisit: acc.toVisit + s.toVisit, followUp: acc.followUp + s.followUp,
+    demos: acc.demos + s.demos, dq: acc.dq + s.dq, total: acc.total + s.total
+  }), { toVisit: 0, followUp: 0, demos: 0, dq: 0, total: 0 });
 
   container.innerHTML = `
     <div class="dashboard-totals">
@@ -506,10 +643,18 @@ async function renderDashboard() {
       <div class="total-card green"><span class="total-value">${totals.demos}</span><label>Demos</label></div>
     </div>
     <div class="section-title" style="padding:16px 16px 8px">Rep Rankings</div>
-    <div class="leaderboard">${stats.map((s, i) => `
-      <div class="leaderboard-row"><span class="rank">${i + 1}</span><span class="rep-name">${s.repName}</span>
-        <div class="rep-stats"><span class="stat-pill green">${s.demos} demos</span><span class="stat-pill yellow">${s.followUp} follow</span><span class="stat-pill red">${s.toVisit} left</span></div>
-      </div>`).join('')}
+    <div class="leaderboard">
+      ${stats.map((s, i) => `
+        <div class="leaderboard-row">
+          <span class="rank">${i + 1}</span>
+          <span class="rep-name">${s.repName}</span>
+          <div class="rep-stats">
+            <span class="stat-pill green">${s.demos} demos</span>
+            <span class="stat-pill yellow">${s.followUp} follow</span>
+            <span class="stat-pill red">${s.toVisit} left</span>
+          </div>
+        </div>
+      `).join('')}
     </div>
   `;
 }
@@ -524,40 +669,75 @@ async function exportDashboard() {
 
 // ============ ADMIN ============
 
-function showAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); renderAdminTabs(); showAdminTab('shows'); }
+function showAdminModal() { 
+  document.getElementById('admin-modal').classList.remove('hidden'); 
+  renderAdminTabs();
+  showAdminTab('shows'); 
+}
 function hideAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
 
 function renderAdminTabs() {
   const container = document.getElementById('admin-tabs');
-  container.innerHTML = `<button class="admin-tab active" data-tab="shows">Shows</button><button class="admin-tab" data-tab="reps">Reps</button><button class="admin-tab" data-tab="import">Import</button>`;
-  container.querySelectorAll('.admin-tab').forEach(btn => btn.addEventListener('click', () => {
-    container.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    showAdminTab(btn.dataset.tab);
-  }));
+  container.innerHTML = `
+    <button class="admin-tab active" data-tab="shows">Shows</button>
+    <button class="admin-tab" data-tab="reps">Reps</button>
+    <button class="admin-tab" data-tab="import">Import</button>
+  `;
+  container.querySelectorAll('.admin-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      showAdminTab(btn.dataset.tab);
+    });
+  });
 }
 
 function showAdminTab(tab) {
   const content = document.getElementById('admin-content');
   
   if (tab === 'shows') {
-    content.innerHTML = `<div class="admin-list">${shows.map(s => `<div class="admin-item"><span>${s.name}</span><span class="muted">${s.location || ''}</span></div>`).join('')}</div><button class="btn primary full" id="add-show-btn"><i class="fas fa-plus"></i> Add Show</button>`;
+    content.innerHTML = `
+      <div class="admin-list">${shows.map(s => `<div class="admin-item"><span>${s.name}</span><span class="muted">${s.location || ''}</span></div>`).join('')}</div>
+      <button class="btn primary full" id="add-show-btn"><i class="fas fa-plus"></i> Add Show</button>
+    `;
     document.getElementById('add-show-btn').addEventListener('click', addShowPrompt);
   } else if (tab === 'reps') {
-    content.innerHTML = `<div class="admin-list">${reps.map(r => `<div class="admin-item"><span>${r.name}</span></div>`).join('')}</div><button class="btn primary full" id="add-rep-btn"><i class="fas fa-plus"></i> Add Rep</button>`;
+    content.innerHTML = `
+      <div class="admin-list">${reps.map(r => `<div class="admin-item"><span>${r.name}</span></div>`).join('')}</div>
+      <button class="btn primary full" id="add-rep-btn"><i class="fas fa-plus"></i> Add Rep</button>
+    `;
     document.getElementById('add-rep-btn').addEventListener('click', addRepPrompt);
   } else if (tab === 'import') {
     content.innerHTML = `
       <div class="import-section">
-        <label>Select Show</label><select id="import-show" class="input">${shows.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
-        <label>Select Rep (for Hit List)</label><select id="import-rep" class="input"><option value="">-- None (Master/Customers/Opps) --</option>${reps.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}</select>
-        <label>List Type</label><select id="import-list-type" class="input"><option value="${LIST_TYPES.HIT_LIST}">Hit List</option><option value="${LIST_TYPES.MASTER}">Master</option><option value="${LIST_TYPES.CUSTOMERS}">Customers</option><option value="${LIST_TYPES.CURRENT_OPPS}">Current Opps</option></select>
-        <label>Google Sheet URL</label><input type="url" id="import-url" class="input" placeholder="https://docs.google.com/spreadsheets/d/...">
+        <label>Select Show</label>
+        <select id="import-show" class="input">${shows.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        
+        <label>Select Rep (for Hit List)</label>
+        <select id="import-rep" class="input">
+          <option value="">-- None (Master/Customers/Opps) --</option>
+          ${reps.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+        </select>
+        
+        <label>List Type</label>
+        <select id="import-list-type" class="input">
+          <option value="${LIST_TYPES.HIT_LIST}">Hit List</option>
+          <option value="${LIST_TYPES.MASTER}">Master</option>
+          <option value="${LIST_TYPES.CUSTOMERS}">Customers</option>
+          <option value="${LIST_TYPES.CURRENT_OPPS}">Current Opps</option>
+        </select>
+        
+        <label>Google Sheet URL</label>
+        <input type="url" id="import-url" class="input" placeholder="https://docs.google.com/spreadsheets/d/...">
         <button class="btn primary full" id="import-sheet-btn"><i class="fas fa-cloud-download-alt"></i> Import from Sheet</button>
+        
         <div class="divider">OR</div>
-        <label>Paste Data (Tab-delimited)</label><textarea id="import-paste" class="input" rows="6" placeholder="Paste from Google Sheets..."></textarea>
+        
+        <label>Paste Data (Tab-delimited)</label>
+        <textarea id="import-paste" class="input" rows="6" placeholder="Paste from Google Sheets..."></textarea>
         <button class="btn primary full" id="import-paste-btn"><i class="fas fa-paste"></i> Import Pasted Data</button>
-      </div>`;
+      </div>
+    `;
     document.getElementById('import-sheet-btn').addEventListener('click', importFromSheet);
     document.getElementById('import-paste-btn').addEventListener('click', importFromPaste);
   }
@@ -566,14 +746,17 @@ function showAdminTab(tab) {
 async function addShowPrompt() {
   const name = prompt('Show name:'); if (!name) return;
   const location = prompt('Location:') || '';
-  await saveShow({ id: name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(), name, location, startDate: '', endDate: '', website: '', exhibitorList: '' });
+  const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+  await saveShow({ id, name, location, startDate: '', endDate: '', website: '', exhibitorList: '' });
   shows = await getShows();
   showAdminTab('shows');
+  renderShowList();
 }
 
 async function addRepPrompt() {
   const name = prompt('Rep name:'); if (!name) return;
-  await saveRep({ id: name.toLowerCase().replace(/\s+/g, '_'), name });
+  const id = name.toLowerCase().replace(/\s+/g, '_');
+  await saveRep({ id, name });
   reps = await getReps();
   showAdminTab('reps');
 }
@@ -583,13 +766,19 @@ async function addRepPrompt() {
 async function importFromSheet() {
   const url = document.getElementById('import-url').value.trim();
   if (!url) return alert('Enter a Google Sheet URL');
+  
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (!match) return alert('Invalid Google Sheets URL');
+  
   try {
-    const response = await fetch(`https://docs.google.com/spreadsheets/d/${match[1]}/export?format=tsv`);
-    if (!response.ok) throw new Error('Could not fetch sheet');
-    processImportData(await response.text());
-  } catch (err) { alert('Import failed: ' + err.message); }
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=tsv`;
+    const response = await fetch(csvUrl);
+    if (!response.ok) throw new Error('Could not fetch sheet - make sure it\'s publicly accessible');
+    const text = await response.text();
+    processImportData(text);
+  } catch (err) {
+    alert('Import failed: ' + err.message);
+  }
 }
 
 function importFromPaste() {
@@ -601,50 +790,78 @@ function importFromPaste() {
 function processImportData(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return alert('No data found');
-  pendingImportData = { headers: lines[0].split('\t').map(h => h.trim()), lines: lines.slice(1) };
+  
+  const headers = lines[0].split('\t').map(h => h.trim());
+  pendingImportData = { headers, lines: lines.slice(1) };
+  
   showMapperModal();
 }
 
 function showMapperModal() {
   const { headers } = pendingImportData;
+  
+  // Auto-detect mappings
   columnMapping = {};
   const headerLower = headers.map(h => h.toLowerCase());
-  const patterns = {
-    companyName: ['company name', 'company', 'name', 'merchant'],
-    boothNumber: ['booth', 'booth#', 'booth number'],
-    domain: ['domain', 'website', 'url', 'company domain'],
-    estimatedMonthlySales: ['est monthly sales', 'estimated monthly sales', 'monthly sales', 'revenue'],
-    platform: ['platform', 'ecommerce platform'],
-    protection: ['protection', 'competitor', 'shipping protection'],
-    returns: ['returns', 'return provider']
-  };
+  
   REQUIRED_FIELDS.forEach(field => {
+    const patterns = {
+      companyName: ['company name', 'company', 'name', 'merchant'],
+      boothNumber: ['booth', 'booth#', 'booth number', 'booth #'],
+      domain: ['domain', 'website', 'url', 'company domain'],
+      estimatedMonthlySales: ['est monthly sales', 'estimated monthly sales', 'monthly sales', 'revenue', 'gmv'],
+      platform: ['platform', 'ecommerce platform', 'cart'],
+      protection: ['protection', 'competitor', 'competitor tracking', 'shipping protection'],
+      returns: ['returns', 'return provider', 'returns provider']
+    };
+    
     const found = headerLower.findIndex(h => patterns[field.key]?.some(p => h.includes(p)));
     if (found >= 0) columnMapping[field.key] = found;
   });
+  
   renderMapperContent();
   document.getElementById('mapper-modal').classList.remove('hidden');
 }
 
 function renderMapperContent() {
   const { headers } = pendingImportData;
-  const content = document.getElementById('mapper-content');
-  content.innerHTML = `<p class="hint">Map your columns to the required fields:</p><div class="mapper-grid">${REQUIRED_FIELDS.map(field => `
-    <div class="mapper-row"><label>${field.label}${field.required ? ' *' : ''}</label>
-      <select class="input" data-field="${field.key}"><option value="">-- Skip --</option>${headers.map((h, i) => `<option value="${i}" ${columnMapping[field.key] === i ? 'selected' : ''}>${h}</option>`).join('')}</select>
-    </div>`).join('')}</div>`;
-  content.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => {
-    columnMapping[sel.dataset.field] = sel.value === '' ? undefined : parseInt(sel.value);
-  }));
+  const container = document.getElementById('mapper-content');
+  
+  container.innerHTML = `
+    <p class="hint">Map your columns to the required fields:</p>
+    <div class="mapper-grid">
+      ${REQUIRED_FIELDS.map(field => `
+        <div class="mapper-row">
+          <label>${field.label}${field.required ? ' *' : ''}</label>
+          <select class="input" data-field="${field.key}">
+            <option value="">-- Skip --</option>
+            ${headers.map((h, i) => `<option value="${i}" ${columnMapping[field.key] === i ? 'selected' : ''}>${h}</option>`).join('')}
+          </select>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  container.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const field = sel.dataset.field;
+      columnMapping[field] = sel.value === '' ? undefined : parseInt(sel.value);
+    });
+  });
 }
 
-function hideMapperModal() { document.getElementById('mapper-modal').classList.add('hidden'); pendingImportData = null; }
+function hideMapperModal() {
+  document.getElementById('mapper-modal').classList.add('hidden');
+  pendingImportData = null;
+}
 
 async function confirmMapping() {
   if (columnMapping.companyName === undefined) return alert('Company Name is required');
+  
   const showId = document.getElementById('import-show').value;
   const repId = document.getElementById('import-rep').value || null;
   const listType = document.getElementById('import-list-type').value;
+  
   const { lines } = pendingImportData;
   const newBooths = [];
   
@@ -660,16 +877,24 @@ async function confirmMapping() {
       platform: columnMapping.platform !== undefined ? vals[columnMapping.platform] : '',
       protection: columnMapping.protection !== undefined ? vals[columnMapping.protection] : '',
       returns: columnMapping.returns !== undefined ? vals[columnMapping.returns] : '',
-      status: STATUS.NOT_VISITED, notes: '', contactName: '', ordersPerMonth: 'N/A', aov: 'N/A', businessCardData: null
+      status: STATUS.NOT_VISITED,
+      notes: '', contactName: '', ordersPerMonth: 'N/A', aov: 'N/A', businessCardData: null
     };
+    
     if (booth.companyName) newBooths.push(booth);
   }
   
   if (newBooths.length === 0) return alert('No valid data found');
+  
   await deleteBoothsForList(showId, repId, listType);
   await saveBooths(newBooths);
+  
   hideMapperModal();
   hideAdminModal();
   alert(`Imported ${newBooths.length} records`);
-  if (currentShowId === showId) { await loadBoothList(); renderBoothList(); }
+  
+  if (currentShowId === showId) {
+    await loadBoothList();
+    renderBoothList();
+  }
 }

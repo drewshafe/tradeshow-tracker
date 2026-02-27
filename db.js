@@ -1,11 +1,11 @@
-// Database Layer - wrapped to avoid Supabase global conflict
+// Database Layer - IIFE to avoid global conflicts
 (function() {
   let sbClient = null;
   let useSupabase = false;
 
   // Initialize database
   window.initDB = async function() {
-    if (SUPABASE_URL !== 'https://your-project.supabase.co') {
+    if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL !== 'https://your-project.supabase.co') {
       try {
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         useSupabase = true;
@@ -14,10 +14,10 @@
         console.warn('Supabase init failed, using localStorage', e);
       }
     } else {
-      console.log('Using localStorage (Supabase not configured)');
+      console.log('Using localStorage');
     }
     
-    // Initialize default data if needed
+    // Initialize default data
     let shows = JSON.parse(localStorage.getItem('shows') || '[]');
     if (shows.length === 0) {
       localStorage.setItem('shows', JSON.stringify(DEFAULT_SHOWS));
@@ -46,7 +46,7 @@
         website: show.website, exhibitor_list: show.exhibitorList
       });
     } else {
-      const shows = await getShows();
+      const shows = await window.getShows();
       const idx = shows.findIndex(s => s.id === show.id);
       if (idx >= 0) shows[idx] = show;
       else shows.push(show);
@@ -59,10 +59,10 @@
       await sbClient.from('shows').delete().eq('id', showId);
       await sbClient.from('booths').delete().eq('show_id', showId);
     } else {
-      const shows = (await getShows()).filter(s => s.id !== showId);
+      const shows = (await window.getShows()).filter(s => s.id !== showId);
       localStorage.setItem('shows', JSON.stringify(shows));
-      const allBooths = JSON.parse(localStorage.getItem('booths') || '[]');
-      localStorage.setItem('booths', JSON.stringify(allBooths.filter(b => b.showId !== showId)));
+      const booths = JSON.parse(localStorage.getItem('booths') || '[]').filter(b => b.showId !== showId);
+      localStorage.setItem('booths', JSON.stringify(booths));
     }
   };
 
@@ -79,7 +79,7 @@
     if (useSupabase) {
       await sbClient.from('reps').upsert({ id: rep.id, name: rep.name });
     } else {
-      const reps = await getReps();
+      const reps = await window.getReps();
       const idx = reps.findIndex(r => r.id === rep.id);
       if (idx >= 0) reps[idx] = rep;
       else reps.push(rep);
@@ -92,10 +92,10 @@
       await sbClient.from('reps').delete().eq('id', repId);
       await sbClient.from('booths').delete().eq('rep_id', repId);
     } else {
-      const reps = (await getReps()).filter(r => r.id !== repId);
+      const reps = (await window.getReps()).filter(r => r.id !== repId);
       localStorage.setItem('reps', JSON.stringify(reps));
-      const allBooths = JSON.parse(localStorage.getItem('booths') || '[]');
-      localStorage.setItem('booths', JSON.stringify(allBooths.filter(b => b.repId !== repId)));
+      const booths = JSON.parse(localStorage.getItem('booths') || '[]').filter(b => b.repId !== repId);
+      localStorage.setItem('booths', JSON.stringify(booths));
     }
   };
 
@@ -108,7 +108,6 @@
       const { data } = await query;
       return (data || []).map(mapBoothFromDB);
     }
-    
     let booths = JSON.parse(localStorage.getItem('booths') || '[]');
     booths = booths.filter(b => b.showId === showId);
     if (repId) booths = booths.filter(b => b.repId === repId);
@@ -143,20 +142,14 @@
       const existing = JSON.parse(localStorage.getItem('booths') || '[]');
       const existingIds = new Set(existing.map(b => b.id));
       const newBooths = boothsToSave.filter(b => !existingIds.has(b.id));
-      const updated = existing.map(b => {
-        const update = boothsToSave.find(u => u.id === b.id);
-        return update || b;
-      });
+      const updated = existing.map(b => boothsToSave.find(u => u.id === b.id) || b);
       localStorage.setItem('booths', JSON.stringify([...updated, ...newBooths]));
     }
   };
 
   window.deleteBoothsForList = async function(showId, repId, listType) {
     if (useSupabase) {
-      await sbClient.from('booths').delete()
-        .eq('show_id', showId)
-        .eq('rep_id', repId)
-        .eq('list_type', listType);
+      await sbClient.from('booths').delete().eq('show_id', showId).eq('rep_id', repId).eq('list_type', listType);
     } else {
       const booths = JSON.parse(localStorage.getItem('booths') || '[]')
         .filter(b => !(b.showId === showId && b.repId === repId && b.listType === listType));
@@ -164,6 +157,7 @@
     }
   };
 
+  // Mappers
   function mapBoothFromDB(row) {
     return {
       id: row.id, showId: row.show_id, repId: row.rep_id, listType: row.list_type,
@@ -188,8 +182,8 @@
 
   // ============ DASHBOARD ============
   window.getDashboardStats = async function(showId) {
-    const allBooths = await getAllBoothsForShow(showId);
-    const reps = await getReps();
+    const allBooths = await window.getAllBoothsForShow(showId);
+    const reps = await window.getReps();
     
     const stats = reps.map(rep => {
       const repBooths = allBooths.filter(b => b.repId === rep.id && b.listType === LIST_TYPES.HIT_LIST);
@@ -207,14 +201,14 @@
     return stats;
   };
 
+  // ============ EXPORT ============
   window.exportToCSV = async function(showId, repId, listType) {
-    const booths = repId ? await getBooths(showId, repId, listType) : await getAllBoothsForShow(showId);
+    const booths = repId ? await window.getBooths(showId, repId, listType) : await window.getAllBoothsForShow(showId);
     const headers = ['Company Name', 'Booth', 'Domain', 'Est Monthly Sales', 'Platform', 'Protection', 'Returns', 'Status', 'Contact', 'Orders/Mo', 'AOV', 'Notes', 'Rep', 'List Type'];
     const rows = booths.map(b => [
-      b.companyName, b.boothNumber, b.domain, b.estimatedMonthlySales, b.platform,
-      b.protection, b.returns, STATUS_LABELS[b.status] || b.status, b.contactName,
-      b.ordersPerMonth, b.aov, (b.notes || '').replace(/"/g, '""'), b.repId,
-      LIST_LABELS[b.listType] || b.listType
+      b.companyName, b.boothNumber, b.domain, b.estimatedMonthlySales, b.platform, b.protection, b.returns,
+      STATUS_LABELS[b.status] || b.status, b.contactName, b.ordersPerMonth, b.aov,
+      (b.notes || '').replace(/"/g, '""'), b.repId, LIST_LABELS[b.listType] || b.listType
     ]);
     return [headers, ...rows].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
   };
