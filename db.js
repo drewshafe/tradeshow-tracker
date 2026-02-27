@@ -132,11 +132,17 @@
   window.getHitListWithTags = async function(showId, repId) {
     console.log('getHitListWithTags called:', { showId, repId });
     const allBooths = await window.getAllBoothsForShow(showId);
-    console.log('All booths for show:', allBooths.length, allBooths.map(b => ({ id: b.id, repId: b.repId, listType: b.listType })));
+    console.log('All booths for show:', allBooths.length);
+    
+    // Debug: show unique repIds and listTypes in the data
+    const uniqueRepIds = [...new Set(allBooths.map(b => b.repId))];
+    const uniqueListTypes = [...new Set(allBooths.map(b => b.listType))];
+    console.log('Unique repIds in data:', uniqueRepIds);
+    console.log('Unique listTypes in data:', uniqueListTypes);
     
     // Get direct hit list items
     const hitList = allBooths.filter(b => b.listType === LIST_TYPES.HIT_LIST && b.repId === repId);
-    console.log('Hit list items:', hitList.length);
+    console.log('Hit list items for repId "' + repId + '":', hitList.length);
     
     // Get Working items assigned to this rep (via ownerId -> repId mapping)
     const working = allBooths.filter(b => b.listType === LIST_TYPES.WORKING && getRepIdFromOwner(b.ownerId) === repId)
