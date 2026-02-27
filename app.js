@@ -16,9 +16,19 @@ let cameraStream = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-  await initDB();
-  await loadShows();
-  setupEventListeners();
+  try {
+    console.log('Initializing...');
+    await initDB();
+    console.log('DB initialized');
+    await loadShows();
+    console.log('Shows loaded:', shows.length);
+    console.log('Reps loaded:', reps.length);
+    setupEventListeners();
+    console.log('Ready');
+  } catch (e) {
+    console.error('Init error:', e);
+    alert('Error: ' + e.message);
+  }
 });
 
 function setupEventListeners() {
@@ -116,7 +126,13 @@ function updateListTitle() {
 // ============ SHOW LIST ============
 
 function renderShowList() {
+  console.log('renderShowList called, shows:', shows);
   const container = document.getElementById('show-list');
+  
+  if (!container) {
+    console.error('show-list container not found!');
+    return;
+  }
   
   if (shows.length === 0) {
     container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-alt"></i><p>No shows configured</p><button onclick="showAdminModal()">Add Show</button></div>`;
@@ -124,20 +140,23 @@ function renderShowList() {
   }
   
   container.innerHTML = shows.map(show => {
-    const startDate = new Date(show.startDate);
-    const endDate = new Date(show.endDate);
-    const dateStr = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    const startDate = show.startDate ? new Date(show.startDate) : null;
+    const endDate = show.endDate ? new Date(show.endDate) : null;
+    const dateStr = startDate && endDate 
+      ? `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      : '';
     
     return `
       <div class="show-card" onclick="selectShow('${show.id}')">
         <div class="show-info">
           <h3>${show.name}</h3>
-          <p><i class="fas fa-map-marker-alt"></i> ${show.location} &nbsp; <i class="fas fa-calendar"></i> ${dateStr}</p>
+          <p><i class="fas fa-map-marker-alt"></i> ${show.location || ''} ${dateStr ? `&nbsp; <i class="fas fa-calendar"></i> ${dateStr}` : ''}</p>
         </div>
         <i class="fas fa-chevron-right"></i>
       </div>
     `;
   }).join('');
+  console.log('Show list rendered');
 }
 
 // ============ REP SELECT / TABS ============
