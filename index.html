@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0f0f1a">
   <title>Tradeshow Tracker</title>
@@ -20,7 +20,7 @@
     <div id="show-select-view" class="view active">
       <header class="header">
         <h1>Tradeshow Tracker</h1>
-        <button class="icon-btn" onclick="showAdminModal()"><i class="fas fa-cog"></i></button>
+        <button class="icon-btn" id="admin-btn"><i class="fas fa-cog"></i></button>
       </header>
       <div class="show-list" id="show-list"></div>
     </div>
@@ -28,7 +28,7 @@
     <!-- Rep Selection View -->
     <div id="rep-select-view" class="view">
       <header class="header">
-        <button class="icon-btn" onclick="goToShows()"><i class="fas fa-arrow-left"></i></button>
+        <button class="icon-btn" id="back-to-shows-btn"><i class="fas fa-arrow-left"></i></button>
         <h1 id="rep-select-title">Select Rep</h1>
         <div style="width:40px"></div>
       </header>
@@ -39,7 +39,7 @@
     <!-- Booth List View -->
     <div id="list-view" class="view">
       <header class="header">
-        <button class="icon-btn" onclick="goToRepSelect()"><i class="fas fa-arrow-left"></i></button>
+        <button class="icon-btn" id="back-to-reps-btn"><i class="fas fa-arrow-left"></i></button>
         <h1 id="list-title">Hit List</h1>
         <div style="width:40px"></div>
       </header>
@@ -54,7 +54,7 @@
       <div class="search-bar">
         <i class="fas fa-search"></i>
         <input type="text" id="search-input" placeholder="Search company, booth, domain...">
-        <button id="clear-search" class="hidden" onclick="clearSearch()"><i class="fas fa-times-circle"></i></button>
+        <button id="clear-search" class="hidden"><i class="fas fa-times-circle"></i></button>
       </div>
 
       <div class="filter-bar">
@@ -63,7 +63,7 @@
           <button class="sort-btn" data-sort="value">Value</button>
           <button class="sort-btn" data-sort="name">Name</button>
         </div>
-        <button class="filter-btn" onclick="showFilterModal()">
+        <button class="filter-btn" id="filter-btn">
           <i class="fas fa-sliders-h"></i>
           <span id="filter-badge" class="badge hidden">0</span>
         </button>
@@ -76,7 +76,7 @@
     <!-- Detail View -->
     <div id="detail-view" class="view">
       <header class="header">
-        <button class="icon-btn" onclick="showListView()"><i class="fas fa-arrow-left"></i></button>
+        <button class="icon-btn" id="back-to-list-btn"><i class="fas fa-arrow-left"></i></button>
         <h1 id="detail-company">Company</h1>
         <div style="width:40px"></div>
       </header>
@@ -86,9 +86,9 @@
     <!-- Dashboard View -->
     <div id="dashboard-view" class="view">
       <header class="header">
-        <button class="icon-btn" onclick="goToRepSelect()"><i class="fas fa-arrow-left"></i></button>
+        <button class="icon-btn" id="back-from-dashboard-btn"><i class="fas fa-arrow-left"></i></button>
         <h1 id="dashboard-title">Dashboard</h1>
-        <button class="icon-btn" onclick="exportDashboard()"><i class="fas fa-download"></i></button>
+        <button class="icon-btn" id="export-btn"><i class="fas fa-download"></i></button>
       </header>
       <div id="dashboard-content" class="dashboard-content"></div>
     </div>
@@ -98,12 +98,12 @@
       <div class="modal-content modal-large">
         <div class="modal-header">
           <h2>Filters</h2>
-          <button class="icon-btn" onclick="hideFilterModal()"><i class="fas fa-times"></i></button>
+          <button class="icon-btn" id="close-filter-btn"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body" id="filter-options"></div>
         <div class="modal-footer">
-          <button class="btn secondary" onclick="clearFilters()">Clear All</button>
-          <button class="btn primary" onclick="applyFilters()">Apply</button>
+          <button class="btn secondary" id="clear-filters-btn">Clear All</button>
+          <button class="btn primary" id="apply-filters-btn">Apply</button>
         </div>
       </div>
     </div>
@@ -113,14 +113,10 @@
       <div class="modal-content modal-large">
         <div class="modal-header">
           <h2>Admin</h2>
-          <button class="icon-btn" onclick="hideAdminModal()"><i class="fas fa-times"></i></button>
+          <button class="icon-btn" id="close-admin-btn"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-          <div class="admin-tabs">
-            <button class="admin-tab active" onclick="showAdminTab('shows')">Shows</button>
-            <button class="admin-tab" onclick="showAdminTab('reps')">Reps</button>
-            <button class="admin-tab" onclick="showAdminTab('import')">Import</button>
-          </div>
+          <div class="admin-tabs" id="admin-tabs"></div>
           <div id="admin-content"></div>
         </div>
       </div>
@@ -131,12 +127,12 @@
       <div class="modal-content modal-large">
         <div class="modal-header">
           <h2>Map Columns</h2>
-          <button class="icon-btn" onclick="hideMapperModal()"><i class="fas fa-times"></i></button>
+          <button class="icon-btn" id="close-mapper-btn"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body" id="mapper-content"></div>
         <div class="modal-footer">
-          <button class="btn secondary" onclick="hideMapperModal()">Cancel</button>
-          <button class="btn primary" onclick="confirmMapping()">Import</button>
+          <button class="btn secondary" id="cancel-mapper-btn">Cancel</button>
+          <button class="btn primary" id="confirm-mapper-btn">Import</button>
         </div>
       </div>
     </div>
@@ -147,8 +143,8 @@
         <video id="camera-video" autoplay playsinline></video>
         <div class="camera-frame"><span>Position business card here</span></div>
         <div class="camera-controls">
-          <button class="camera-btn" onclick="closeCameraModal()"><i class="fas fa-times"></i></button>
-          <button class="capture-btn" onclick="capturePhoto()"></button>
+          <button class="camera-btn" id="close-camera-btn"><i class="fas fa-times"></i></button>
+          <button class="capture-btn" id="capture-btn"></button>
           <div style="width:50px"></div>
         </div>
       </div>
