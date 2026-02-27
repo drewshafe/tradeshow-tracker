@@ -727,18 +727,17 @@ function showAdminTab(tab) {
           <option value="${LIST_TYPES.CURRENT_OPPS}">Current Opps</option>
         </select>
         
-        <label>Google Sheet URL</label>
-        <input type="url" id="import-url" class="input" placeholder="https://docs.google.com/spreadsheets/d/...">
-        <button class="btn primary full" id="import-sheet-btn"><i class="fas fa-cloud-download-alt"></i> Import from Sheet</button>
+        <label>Upload CSV File</label>
+        <input type="file" id="import-file" class="input" accept=".csv,.tsv,.txt">
         
         <div class="divider">OR</div>
         
-        <label>Paste Data (Tab-delimited)</label>
-        <textarea id="import-paste" class="input" rows="6" placeholder="Paste from Google Sheets..."></textarea>
-        <button class="btn primary full" id="import-paste-btn"><i class="fas fa-paste"></i> Import Pasted Data</button>
+        <label>Paste Data (Tab or Comma delimited)</label>
+        <textarea id="import-paste" class="input" rows="6" placeholder="Paste from Google Sheets or Excel..."></textarea>
+        <button class="btn primary full" id="import-paste-btn"><i class="fas fa-paste"></i> Import Data</button>
       </div>
     `;
-    document.getElementById('import-sheet-btn').addEventListener('click', importFromSheet);
+    document.getElementById('import-file').addEventListener('change', importFromFile);
     document.getElementById('import-paste-btn').addEventListener('click', importFromPaste);
   }
 }
@@ -763,22 +762,17 @@ async function addRepPrompt() {
 
 // ============ IMPORT ============
 
-async function importFromSheet() {
-  const url = document.getElementById('import-url').value.trim();
-  if (!url) return alert('Enter a Google Sheet URL');
+function importFromFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
   
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!match) return alert('Invalid Google Sheets URL');
-  
-  try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=tsv`;
-    const response = await fetch(csvUrl);
-    if (!response.ok) throw new Error('Could not fetch sheet - make sure it\'s publicly accessible');
-    const text = await response.text();
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
     processImportData(text);
-  } catch (err) {
-    alert('Import failed: ' + err.message);
-  }
+  };
+  reader.onerror = () => alert('Failed to read file');
+  reader.readAsText(file);
 }
 
 function importFromPaste() {
@@ -791,8 +785,39 @@ function processImportData(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return alert('No data found');
   
-  const headers = lines[0].split('\t').map(h => h.trim());
-  pendingImportData = { headers, lines: lines.slice(1) };
+  // Detect delimiter (tab or comma)
+  const firstLine = lines[0];
+  const delimiter = firstLine.includes('\t') ? '\t' : ',';
+  
+  // Parse with delimiter, handling quoted fields for CSV
+  const parseRow = (row) => {
+    if (delimiter === ',') {
+      // Handle CSV with quoted fields
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < row.length; i++) {
+        const char = row[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    } else {
+      return row.split('\t').map(s => s.trim());
+    }
+  };
+  
+  const headers = parseRow(lines[0]);
+  const dataLines = lines.slice(1).map(parseRow);
+  
+  pendingImportData = { headers, lines: dataLines };
   
   showMapperModal();
 }
@@ -865,18 +890,17 @@ async function confirmMapping() {
   const { lines } = pendingImportData;
   const newBooths = [];
   
-  for (const line of lines) {
-    const vals = line.split('\t');
+  for (const vals of lines) {
     const booth = {
       id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       showId, repId, listType,
       companyName: vals[columnMapping.companyName] || '',
-      boothNumber: columnMapping.boothNumber !== undefined ? vals[columnMapping.boothNumber] : '',
-      domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] : '',
+      boothNumber: columnMapping.boothNumber !== undefined ? vals[columnMapping.boothNumber] || '' : '',
+      domain: columnMapping.domain !== undefined ? vals[columnMapping.domain] || '' : '',
       estimatedMonthlySales: columnMapping.estimatedMonthlySales !== undefined ? parseFloat((vals[columnMapping.estimatedMonthlySales] || '0').replace(/[$,]/g, '')) || 0 : 0,
-      platform: columnMapping.platform !== undefined ? vals[columnMapping.platform] : '',
-      protection: columnMapping.protection !== undefined ? vals[columnMapping.protection] : '',
-      returns: columnMapping.returns !== undefined ? vals[columnMapping.returns] : '',
+      platform: columnMapping.platform !== undefined ? vals[columnMapping.platform] || '' : '',
+      protection: columnMapping.protection !== undefined ? vals[columnMapping.protection] || '' : '',
+      returns: columnMapping.returns !== undefined ? vals[columnMapping.returns] || '' : '',
       status: STATUS.NOT_VISITED,
       notes: '', contactName: '', ordersPerMonth: 'N/A', aov: 'N/A', businessCardData: null
     };
