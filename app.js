@@ -44,6 +44,18 @@ function setupEventListeners() {
   document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
   document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
   
+  // List actions menu
+  document.getElementById('list-actions-btn').addEventListener('click', toggleListActionsMenu);
+  document.getElementById('reimport-btn').addEventListener('click', showReimportModal);
+  document.getElementById('clear-list-btn').addEventListener('click', clearCurrentList);
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('list-actions-menu');
+    const btn = document.getElementById('list-actions-btn');
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+      menu.classList.add('hidden');
+    }
+  });
+  
   // Admin modal
   document.getElementById('close-admin-btn').addEventListener('click', hideAdminModal);
   
@@ -623,6 +635,44 @@ function renderFilterOptions() {
 
 function applyFilters() { filters = { ...tempFilters }; hideFilterModal(); renderBoothList(); }
 function clearFilters() { filters = { platform: 'all', protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters }; hideFilterModal(); renderBoothList(); }
+
+// ============ LIST ACTIONS ============
+
+function toggleListActionsMenu() {
+  document.getElementById('list-actions-menu').classList.toggle('hidden');
+}
+
+function showReimportModal() {
+  document.getElementById('list-actions-menu').classList.add('hidden');
+  // Pre-select current show/rep/list in admin import tab
+  showAdminModal();
+  showAdminTab('import');
+  
+  // Set the dropdowns to current context after a tick (DOM needs to render)
+  setTimeout(() => {
+    const showSelect = document.getElementById('import-show');
+    const repSelect = document.getElementById('import-rep');
+    const listSelect = document.getElementById('import-list-type');
+    
+    if (showSelect && currentShowId) showSelect.value = currentShowId;
+    if (repSelect) repSelect.value = currentRepId || '';
+    if (listSelect && currentListType) listSelect.value = currentListType;
+  }, 50);
+}
+
+async function clearCurrentList() {
+  document.getElementById('list-actions-menu').classList.add('hidden');
+  
+  const listLabel = LIST_LABELS[currentListType] || currentListType;
+  const rep = reps.find(r => r.id === currentRepId);
+  const repName = rep ? rep.name + "'s " : '';
+  
+  if (!confirm(`Delete all booths from ${repName}${listLabel}?\n\nThis cannot be undone.`)) return;
+  
+  await deleteBoothsForList(currentShowId, currentRepId, currentListType);
+  await loadBoothList();
+  renderBoothList();
+}
 
 // ============ DASHBOARD ============
 
