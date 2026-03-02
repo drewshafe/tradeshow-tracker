@@ -88,12 +88,12 @@ const RETURNS_PROVIDERS = [
 
 // Default Shows (reps array defines who is attending each show)
 const DEFAULT_SHOWS = [
-  { id: 'whce2026', name: 'Western Hunting Expo', location: 'SLC', startDate: '2026-02-12', endDate: '2026-02-15', website: 'https://huntexpo.com/', exhibitorList: 'https://whce2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt'] },
-  { id: 'expowest2026', name: 'Expo West', location: 'Anaheim', startDate: '2026-03-03', endDate: '2026-03-06', website: 'https://www.expowest.com/en/home.html', exhibitorList: 'https://www.expowest.com/en/exhibitor-list/2026-exhibitor-list.html', reps: ['drew', 'jason', 'wyatt'] },
-  { id: 'bewell2026', name: 'Be Well', location: 'NY', startDate: '2026-03-08', endDate: '2026-03-10', website: 'https://www.bewellshownewyork.com/', exhibitorList: 'https://iecscibsny2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'] },
-  { id: 'asd2026', name: 'ASD', location: 'Las Vegas', startDate: '2026-03-17', endDate: '2026-03-19', website: 'https://asdonline.com/', exhibitorList: 'https://march2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'] },
-  { id: 'globalpet2026', name: 'Global Pet Expo', location: 'Orlando', startDate: '2026-03-25', endDate: '2026-03-27', website: 'https://globalpetexpo.org/', exhibitorList: 'https://globalpetexpo26.mapyourshow.com/8_0/explore/exhibitor-gallery.cfm', reps: ['drew', 'jason', 'wyatt', 'david'] },
-  { id: 'tpe2026', name: 'TPE', location: 'Las Vegas', startDate: '2026-03-31', endDate: '2026-04-01', website: 'https://totalproductexpo.com/', exhibitorList: 'https://tpe2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'] }
+  { id: 'whce2026', name: 'Western Hunting Expo', location: 'SLC', startDate: '2026-02-12', endDate: '2026-02-15', website: 'https://huntexpo.com/', exhibitorList: 'https://whce2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt'], alignedRoomUrl: '' },
+  { id: 'expowest2026', name: 'Expo West', location: 'Anaheim', startDate: '2026-03-03', endDate: '2026-03-06', website: 'https://www.expowest.com/en/home.html', exhibitorList: 'https://www.expowest.com/en/exhibitor-list/2026-exhibitor-list.html', reps: ['drew', 'jason', 'wyatt'], alignedRoomUrl: '' },
+  { id: 'bewell2026', name: 'Be Well', location: 'NY', startDate: '2026-03-08', endDate: '2026-03-10', website: 'https://www.bewellshownewyork.com/', exhibitorList: 'https://iecscibsny2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'], alignedRoomUrl: '' },
+  { id: 'asd2026', name: 'ASD', location: 'Las Vegas', startDate: '2026-03-17', endDate: '2026-03-19', website: 'https://asdonline.com/', exhibitorList: 'https://march2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'], alignedRoomUrl: '' },
+  { id: 'globalpet2026', name: 'Global Pet Expo', location: 'Orlando', startDate: '2026-03-25', endDate: '2026-03-27', website: 'https://globalpetexpo.org/', exhibitorList: 'https://globalpetexpo26.mapyourshow.com/8_0/explore/exhibitor-gallery.cfm', reps: ['drew', 'jason', 'wyatt', 'david'], alignedRoomUrl: '' },
+  { id: 'tpe2026', name: 'TPE', location: 'Las Vegas', startDate: '2026-03-31', endDate: '2026-04-01', website: 'https://totalproductexpo.com/', exhibitorList: 'https://tpe2026.smallworldlabs.com/exhibitors', reps: ['drew', 'jason', 'wyatt', 'david'], alignedRoomUrl: '' }
 ];
 
 // Default Reps
