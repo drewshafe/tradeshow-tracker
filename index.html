@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260228e"></head>
+  <link rel="stylesheet" href="styles.css?v=20260228f"></head>
 <body>
   <div id="app">
     <!-- Show Selection View -->
@@ -42,6 +42,16 @@
         <h1 id="list-title">Hit List</h1>
         <div style="width:40px"></div>
       </header>
+      
+      <div id="shared-list-tabs-bar" class="shared-list-tabs-bar hidden">
+        <a href="#" id="gs-link" target="_blank" class="gs-link-small"><i class="fas fa-external-link-alt"></i> Full List</a>
+        <div class="shared-tabs-row">
+          <button class="shared-tab-btn" data-list="customers">Customers</button>
+          <button class="shared-tab-btn" data-list="working">Working</button>
+          <button class="shared-tab-btn" data-list="opps">Opps</button>
+          <button class="shared-tab-btn" data-list="inactive">Inactive</button>
+        </div>
+      </div>
       
       <div class="stats-bar">
         <div class="stat"><span id="stat-showing">0</span><label>Showing</label></div>
@@ -159,8 +169,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260228e"></script>
-  <script src="db.js?v=20260228e"></script>
-  <script src="app.js?v=20260228e"></script>
+  <script src="config.js?v=20260228f"></script>
+  <script src="db.js?v=20260228f"></script>
+  <script src="app.js?v=20260228f"></script>
 </body>
 </html>
