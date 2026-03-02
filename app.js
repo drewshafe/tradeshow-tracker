@@ -546,7 +546,10 @@ function renderActiveFilters() {
   let count = 0;
   let chips = [];
 
-  if (filters.platform !== 'all') { count++; chips.push({ key: 'platform', label: filters.platform }); }
+  if (filters.platforms && filters.platforms.length > 0) { 
+    count++; 
+    chips.push({ key: 'platforms', label: filters.platforms.join(', ') }); 
+  }
   if (filters.protection !== 'all') { count++; chips.push({ key: 'protection', label: filters.protection }); }
   if (filters.returns !== 'all') { count++; chips.push({ key: 'returns', label: filters.returns }); }
   if (filters.minRevenue > 0) { count++; chips.push({ key: 'minRevenue', label: `≥ ${formatCurrency(filters.minRevenue)}` }); }
@@ -564,6 +567,7 @@ function renderActiveFilters() {
       chip.addEventListener('click', () => {
         const key = chip.dataset.filter;
         if (key === 'minRevenue') filters[key] = 0;
+        else if (key === 'platforms') filters[key] = [];
         else filters[key] = 'all';
         renderBoothList();
       });
