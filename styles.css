@@ -272,3 +272,18 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 
 /* Dashboard button */
 .dashboard-btn { margin-top: 20px; }
+
+/* Shared Lists Container */
+.shared-lists-container { padding: 16px; }
+.gs-link-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; background: var(--blue); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 500; margin-bottom: 16px; }
+.gs-link-btn:hover { opacity: 0.9; }
+
+.shared-list-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.shared-tab { padding: 8px 14px; background: var(--border); border: none; border-radius: 20px; color: var(--text-muted); font-size: 13px; cursor: pointer; }
+.shared-tab.active { background: #2a3f5f; border: 1px solid var(--blue); color: var(--blue); }
+
+/* Aligned QR Code */
+.aligned-qr-container { text-align: center; padding: 16px; background: var(--bg); border-radius: 12px; }
+.aligned-qr { border-radius: 8px; background: #fff; padding: 8px; }
+.aligned-hint { color: var(--text-muted); font-size: 13px; margin: 12px 0 8px; }
+.aligned-link { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); text-decoration: none; font-size: 14px; }
