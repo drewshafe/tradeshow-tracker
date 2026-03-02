@@ -949,15 +949,16 @@ function showSubmitModal(type) {
       modal.querySelector('#submit-webhook-btn').disabled = true;
       modal.querySelector('#submit-webhook-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
       
-      // Use no-cors mode for Zapier webhooks (they don't return CORS headers)
-      await fetch(webhookUrl, {
+      // Send to webhook
+      fetch(webhookUrl, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       });
       
-      // With no-cors we can't check response, but Zapier webhooks are reliable
+      // Wait a moment for the request to go out
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Update booth status
       if (isDemo) {
         await setStatus(STATUS.DEMO_BOOKED);
