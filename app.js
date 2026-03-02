@@ -114,6 +114,9 @@ function setupEventListeners() {
       renderBoothList();
     });
   });
+  
+  // Shared list tabs
+  setupSharedTabsListeners();
 }
 
 // ============ NAVIGATION ============
@@ -151,6 +154,8 @@ function goToRepSelect() {
 async function selectRep(repId) {
   currentRepId = repId;
   currentListType = LIST_TYPES.HIT_LIST;
+  // Hide shared tabs bar for hit lists
+  document.getElementById('shared-list-tabs-bar').classList.add('hidden');
   await loadBoothList();
   hideAllViews();
   document.getElementById('list-view').classList.add('active');
@@ -245,12 +250,14 @@ function renderShowTabs() {
       
       if (tab === 'reps') {
         currentRepId = null;
+        document.getElementById('shared-list-tabs-bar').classList.add('hidden');
         renderRepList();
       } else if (tab === 'shared-lists') {
         renderSharedListsView();
       } else if (tab === 'people') {
         currentRepId = null;
         currentListType = LIST_TYPES.PEOPLE;
+        document.getElementById('shared-list-tabs-bar').classList.add('hidden');
         await loadPeopleList();
         hideAllViews();
         document.getElementById('list-view').classList.add('active');
@@ -263,48 +270,56 @@ function renderShowTabs() {
 function renderSharedListsView() {
   const container = document.getElementById('rep-content');
   const show = shows.find(s => s.id === currentShowId);
-  const gsLink = show?.exhibitorList || show?.exhibitor_list || '#';
   
   container.innerHTML = `
     <div class="shared-lists-container">
-      <a href="${gsLink}" target="_blank" class="gs-link-btn">
-        <i class="fas fa-external-link-alt"></i> Full ${show?.name || 'Show'} Master List
-      </a>
-      
-      <div class="shared-list-tabs">
-        <button class="shared-tab active" data-list="customers">Customers</button>
-        <button class="shared-tab" data-list="opps">Opps</button>
-        <button class="shared-tab" data-list="inactive">Inactive</button>
-        <button class="shared-tab" data-list="working">Working</button>
-      </div>
-      
-      <div id="shared-list-content"></div>
+      <p style="color: var(--text-muted); text-align: center;">Select a list type above after clicking into Shared Lists</p>
     </div>
   `;
   
-  container.querySelectorAll('.shared-tab').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      container.querySelectorAll('.shared-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      const listType = btn.dataset.list;
-      
-      const typeMap = {
-        'customers': LIST_TYPES.CUSTOMERS,
-        'working': LIST_TYPES.WORKING,
-        'opps': LIST_TYPES.OPPS,
-        'inactive': LIST_TYPES.INACTIVE_CUSTOMERS
-      };
-      currentRepId = null;
-      currentListType = typeMap[listType];
-      await loadBoothList();
-      hideAllViews();
-      document.getElementById('list-view').classList.add('active');
-      updateListTitle();
-    });
+  // Load customers by default
+  showSharedList('customers');
+}
+
+async function showSharedList(listType) {
+  const show = shows.find(s => s.id === currentShowId);
+  const gsLink = show?.exhibitorList || show?.exhibitor_list || '#';
+  
+  // Update GS link
+  const gsLinkEl = document.getElementById('gs-link');
+  if (gsLinkEl) {
+    gsLinkEl.href = gsLink;
+    gsLinkEl.innerHTML = `<i class="fas fa-external-link-alt"></i> Full ${show?.name || 'Show'} List`;
+  }
+  
+  // Show the tabs bar
+  const tabsBar = document.getElementById('shared-list-tabs-bar');
+  tabsBar.classList.remove('hidden');
+  
+  // Update active tab
+  tabsBar.querySelectorAll('.shared-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.list === listType);
   });
   
-  // Auto-click Customers tab
-  container.querySelector('.shared-tab[data-list="customers"]').click();
+  // Set list type and load
+  const typeMap = {
+    'customers': LIST_TYPES.CUSTOMERS,
+    'working': LIST_TYPES.WORKING,
+    'opps': LIST_TYPES.OPPS,
+    'inactive': LIST_TYPES.INACTIVE_CUSTOMERS
+  };
+  currentRepId = null;
+  currentListType = typeMap[listType];
+  await loadBoothList();
+  hideAllViews();
+  document.getElementById('list-view').classList.add('active');
+  updateListTitle();
+}
+
+function setupSharedTabsListeners() {
+  document.querySelectorAll('.shared-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => showSharedList(btn.dataset.list));
+  });
 }
 
 function renderRepList() {
