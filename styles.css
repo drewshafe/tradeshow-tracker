@@ -287,3 +287,11 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .aligned-qr { border-radius: 8px; background: #fff; padding: 8px; }
 .aligned-hint { color: var(--text-muted); font-size: 13px; margin: 12px 0 8px; }
 .aligned-link { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); text-decoration: none; font-size: 14px; }
+
+/* Shared List Tabs Bar (in list view) */
+.shared-list-tabs-bar { padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border); }
+.shared-list-tabs-bar.hidden { display: none; }
+.gs-link-small { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); text-decoration: none; font-size: 13px; margin-bottom: 10px; }
+.shared-tabs-row { display: flex; gap: 8px; }
+.shared-tab-btn { padding: 8px 14px; background: var(--border); border: none; border-radius: 20px; color: var(--text-muted); font-size: 13px; cursor: pointer; }
+.shared-tab-btn.active { background: #2a3f5f; border: 1px solid var(--blue); color: var(--blue); }
