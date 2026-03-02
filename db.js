@@ -46,7 +46,8 @@
         id: show.id, name: show.name, location: show.location,
         start_date: show.startDate, end_date: show.endDate,
         website: show.website, exhibitor_list: show.exhibitorList,
-        reps: show.reps || null
+        reps: show.reps || null,
+        aligned_room_url: show.alignedRoomUrl || null
       });
     } else {
       const shows = await window.getShows();
@@ -390,6 +391,7 @@
   window.getDashboardStats = async function(showId) {
     const allBooths = await window.getAllBoothsForShow(showId);
     const reps = await window.getReps();
+    const MIN_SALES_FOR_TO_VISIT = 300000; // $300k threshold for To Visit count
     
     const stats = reps.map(rep => {
       // Direct hit list items
@@ -400,10 +402,16 @@
       
       const combined = [...hitList, ...working, ...opps];
       
+      // To Visit only counts items with $300k+ estimated monthly sales
+      const toVisitFiltered = combined.filter(b => 
+        (b.status === STATUS.NOT_VISITED || !b.status) && 
+        (b.estimatedMonthlySales || 0) >= MIN_SALES_FOR_TO_VISIT
+      );
+      
       return {
         repId: rep.id,
         repName: rep.name,
-        toVisit: combined.filter(b => b.status === STATUS.NOT_VISITED || !b.status).length,
+        toVisit: toVisitFiltered.length,
         followUp: combined.filter(b => b.status === STATUS.FOLLOW_UP).length,
         demos: combined.filter(b => b.status === STATUS.DEMO_BOOKED).length,
         dq: combined.filter(b => b.status === STATUS.DQ).length,
