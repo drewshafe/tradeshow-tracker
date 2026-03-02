@@ -45,7 +45,8 @@
       await sbClient.from('shows').upsert({
         id: show.id, name: show.name, location: show.location,
         start_date: show.startDate, end_date: show.endDate,
-        website: show.website, exhibitor_list: show.exhibitorList
+        website: show.website, exhibitor_list: show.exhibitorList,
+        reps: show.reps || null
       });
     } else {
       const shows = await window.getShows();
@@ -306,7 +307,9 @@
       claimedAt: row.claimed_at,
       sourceListType: row.source_list_type,
       sourceBoothId: row.source_booth_id,
-      tag: row.tag
+      tag: row.tag,
+      appInstalled: row.app_installed,
+      productOffering: row.product_offering
     };
   }
 
@@ -349,7 +352,9 @@
       claimed_at: booth.claimedAt,
       source_list_type: booth.sourceListType,
       source_booth_id: booth.sourceBoothId,
-      tag: booth.tag
+      tag: booth.tag,
+      app_installed: booth.appInstalled,
+      product_offering: booth.productOffering
     };
   }
 
