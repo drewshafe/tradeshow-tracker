@@ -262,3 +262,19 @@ function getRepIdFromOwner(ownerId) {
   const owner = HUBSPOT_OWNERS[String(ownerId)];
   return owner?.isTradeShowRep ? owner.repId : null;
 }
+
+// Helper function to get HubSpot owner ID from rep ID
+function getHubSpotOwnerId(repId) {
+  for (const [ownerId, owner] of Object.entries(HUBSPOT_OWNERS)) {
+    if (owner.repId === repId) return ownerId;
+  }
+  return null;
+}
+
+// Helper to get rep name from rep ID
+function getRepName(repId) {
+  for (const owner of Object.values(HUBSPOT_OWNERS)) {
+    if (owner.repId === repId) return owner.name;
+  }
+  return repId;
+}
