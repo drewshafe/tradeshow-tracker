@@ -14,6 +14,17 @@ let pendingImportData = null;
 let columnMapping = {};
 let cameraStream = null;
 
+// Helper to get app badge (EcoCart or ShipInsure)
+function getAppBadge(appInstalled, productOffering) {
+  const app = (appInstalled || productOffering || '').toLowerCase();
+  if (app.includes('ecocart')) {
+    return '<span class="app-badge ecocart">EcoCart</span>';
+  } else if (app.includes('shipinsure') || app.includes('ship insure')) {
+    return '<span class="app-badge shipinsure">ShipInsure</span>';
+  }
+  return '';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -250,10 +261,13 @@ function renderShowTabs() {
 
 function renderRepList() {
   const container = document.getElementById('rep-content');
+  const show = shows.find(s => s.id === currentShowId);
+  const showReps = show?.reps || reps.map(r => r.id); // Default to all reps if not specified
+  const filteredReps = reps.filter(r => showReps.includes(r.id));
   
   container.innerHTML = `
     <div class="rep-list">
-      ${reps.map(rep => `
+      ${filteredReps.map(rep => `
         <div class="rep-card" data-rep-id="${rep.id}">
           <div class="rep-avatar">${rep.name.charAt(0)}</div>
           <span>${rep.name}</span>
@@ -261,11 +275,16 @@ function renderRepList() {
         </div>
       `).join('')}
     </div>
+    <button class="btn secondary dashboard-btn" id="rep-dashboard-btn" style="margin: 20px auto; display: block;">
+      <i class="fas fa-chart-bar"></i> Dashboard
+    </button>
   `;
   
   container.querySelectorAll('.rep-card').forEach(card => {
     card.addEventListener('click', () => selectRep(card.dataset.repId));
   });
+  
+  document.getElementById('rep-dashboard-btn')?.addEventListener('click', showDashboard);
 }
 
 // ============ BOOTH LIST ============
@@ -381,6 +400,7 @@ function renderBoothList() {
 
   // Grid view for Master, Customer, Working, Opps, People
   if (config.isGrid) {
+    const showAppColumn = currentListType === LIST_TYPES.CUSTOMERS;
     list.innerHTML = `
       <div class="grid-view">
         <div class="grid-header">
@@ -389,16 +409,20 @@ function renderBoothList() {
           <span>Sales</span>
           <span>Platform</span>
           ${config.showRep ? '<span>Owner</span>' : ''}
+          ${showAppColumn ? '<span>App</span>' : ''}
         </div>
-        ${filtered.map(b => `
+        ${filtered.map(b => {
+          const appBadge = getAppBadge(b.appInstalled, b.productOffering);
+          return `
           <div class="grid-row">
             <span class="booth-num">${b.boothNumber || '-'}</span>
             <span class="primary">${b.companyName || 'Unknown'}</span>
             <span class="sales">${formatCurrency(b.estimatedMonthlySales)}</span>
             <span>${b.platform || ''}</span>
             ${config.showRep ? `<span class="owner">${getOwnerName(b.ownerId)}</span>` : ''}
+            ${showAppColumn ? `<span>${appBadge}</span>` : ''}
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     `;
     return;
@@ -1209,7 +1233,9 @@ async function confirmMapping() {
         associatedDeal: getValue('associatedDeal'),
         associatedDealIds: getValue('associatedDealIds'),
         dealRecordId: getValue('dealRecordId'),
-        dealName: getValue('dealName')
+        dealName: getValue('dealName'),
+        appInstalled: getValue('appInstalled'),
+        productOffering: getValue('productOffering')
       };
       
       if (booth.companyName) newBooths.push(booth);
