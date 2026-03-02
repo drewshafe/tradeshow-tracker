@@ -263,19 +263,18 @@ function renderShowTabs() {
 function renderSharedListsView() {
   const container = document.getElementById('rep-content');
   const show = shows.find(s => s.id === currentShowId);
-  const gsLink = show?.exhibitorList || '#';
+  const gsLink = show?.exhibitorList || show?.exhibitor_list || '#';
   
   container.innerHTML = `
     <div class="shared-lists-container">
       <a href="${gsLink}" target="_blank" class="gs-link-btn">
-        <i class="fas fa-external-link-alt"></i> Full ${show?.name || 'Show'} Exhibitor List
+        <i class="fas fa-external-link-alt"></i> Full ${show?.name || 'Show'} Master List
       </a>
       
       <div class="shared-list-tabs">
-        <button class="shared-tab active" data-list="master">Master</button>
-        <button class="shared-tab" data-list="customers">Customers</button>
-        <button class="shared-tab" data-list="inactive">Inactive</button>
+        <button class="shared-tab active" data-list="customers">Customers</button>
         <button class="shared-tab" data-list="opps">Opps</button>
+        <button class="shared-tab" data-list="inactive">Inactive</button>
         <button class="shared-tab" data-list="working">Working</button>
       </div>
       
@@ -290,7 +289,6 @@ function renderSharedListsView() {
       const listType = btn.dataset.list;
       
       const typeMap = {
-        'master': LIST_TYPES.MASTER,
         'customers': LIST_TYPES.CUSTOMERS,
         'working': LIST_TYPES.WORKING,
         'opps': LIST_TYPES.OPPS,
@@ -305,8 +303,8 @@ function renderSharedListsView() {
     });
   });
   
-  // Auto-click Master tab
-  container.querySelector('.shared-tab[data-list="master"]').click();
+  // Auto-click Customers tab
+  container.querySelector('.shared-tab[data-list="customers"]').click();
 }
 
 function renderRepList() {
@@ -1015,7 +1013,6 @@ function showAdminTab(tab) {
         <label>List Type</label>
         <select id="import-list-type" class="input">
           <option value="${LIST_TYPES.HIT_LIST}">Hit List</option>
-          <option value="${LIST_TYPES.MASTER}">Master</option>
           <option value="${LIST_TYPES.CUSTOMERS}">Customers</option>
           <option value="${LIST_TYPES.WORKING}">Working</option>
           <option value="${LIST_TYPES.OPPS}">Opps</option>
