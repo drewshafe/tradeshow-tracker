@@ -478,18 +478,34 @@ function renderBoothList() {
         </div>
         ${filtered.map(b => {
           const appBadge = getAppBadge(b.appInstalled, b.productOffering);
+          const appToggle = showAppColumn ? `
+            <span class="app-toggle" data-booth-id="${b.id}" data-current="${b.appInstalled || ''}">
+              ${appBadge || '<button class="app-select-btn">Set App</button>'}
+            </span>` : '';
           return `
-          <div class="grid-row">
+          <div class="grid-row" data-booth-id="${b.id}">
             <span class="booth-num">${b.boothNumber || '-'}</span>
             <span class="primary">${b.companyName || 'Unknown'}</span>
             <span class="sales">${formatCurrency(b.estimatedMonthlySales)}</span>
             <span>${b.platform || ''}</span>
             ${config.showRep ? `<span class="owner">${getOwnerName(b.ownerId)}</span>` : ''}
-            ${showAppColumn ? `<span>${appBadge}</span>` : ''}
+            ${appToggle}
           </div>
         `}).join('')}
       </div>
     `;
+    
+    // Add click handlers for app toggle
+    if (showAppColumn) {
+      list.querySelectorAll('.app-toggle').forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const boothId = toggle.dataset.boothId;
+          const current = toggle.dataset.current?.toLowerCase() || '';
+          showAppSelectModal(boothId, current);
+        });
+      });
+    }
     return;
   }
 
@@ -593,6 +609,47 @@ function renderActiveFilters() {
     badge.classList.add('hidden');
     btn.classList.remove('active');
   }
+}
+
+function showAppSelectModal(boothId, currentApp) {
+  const modal = document.createElement('div');
+  modal.className = 'modal app-select-modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 300px;">
+      <div class="modal-header">
+        <h2>Select App</h2>
+        <button class="icon-btn close-modal-btn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="app-select-options">
+        <button class="app-option-btn ${currentApp === 'ecocart' ? 'selected' : ''}" data-app="ecocart">
+          <span class="app-badge ecocart">EcoCart</span>
+        </button>
+        <button class="app-option-btn ${currentApp === 'shipinsure' ? 'selected' : ''}" data-app="shipinsure">
+          <span class="app-badge shipinsure">ShipInsure</span>
+        </button>
+        <button class="app-option-btn ${!currentApp ? 'selected' : ''}" data-app="">
+          None
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelectorAll('.app-option-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const app = btn.dataset.app;
+      const booth = booths.find(b => b.id === boothId);
+      if (booth) {
+        booth.appInstalled = app;
+        await saveBooth(booth);
+        await loadBoothList();
+      }
+      modal.remove();
+    });
+  });
 }
 
 async function handleClaimLead(boothId) {
@@ -702,7 +759,11 @@ async function showDetailView(id) {
       <div class="section-title">Submit to Slack</div>
       <div class="submit-row">
         <button class="submit-btn" id="copy-followup-btn"><i class="fas fa-copy"></i> Copy for Follow Up</button>
-        <button class="submit-btn demo" id="copy-demo-btn"><i class="fas fa-calendar"></i> Copy for Demo</button>
+        <button class="submit-btn demo" id="copy-demo-btn"><i class="fas fa-copy"></i> Copy for Demo</button>
+      </div>
+      <div class="submit-row" style="margin-top: 8px;">
+        <button class="submit-btn webhook" id="submit-followup-btn"><i class="fas fa-paper-plane"></i> Submit Follow Up</button>
+        <button class="submit-btn webhook demo" id="submit-demo-btn"><i class="fas fa-paper-plane"></i> Submit Demo</button>
       </div>
       <button class="slack-btn" id="open-slack-btn"><i class="fab fa-slack"></i> Open Slack Workflow <i class="fas fa-external-link-alt" style="font-size:12px;opacity:0.6"></i></button>
     </div>
@@ -731,6 +792,8 @@ async function showDetailView(id) {
   
   document.getElementById('copy-followup-btn').addEventListener('click', copyForFollowUp);
   document.getElementById('copy-demo-btn').addEventListener('click', copyForDemo);
+  document.getElementById('submit-followup-btn').addEventListener('click', () => showSubmitModal('followup'));
+  document.getElementById('submit-demo-btn').addEventListener('click', () => showSubmitModal('demo'));
   document.getElementById('open-slack-btn').addEventListener('click', openSlack);
 
   hideAllViews();
@@ -784,6 +847,140 @@ function copyForDemo() {
   navigator.clipboard.writeText(text);
   setStatus(STATUS.DEMO_BOOKED);
   alert('Copied for Demo workflow');
+}
+
+// Webhook URLs
+const WEBHOOK_URLS = {
+  demo: 'https://hooks.zapier.com/hooks/catch/17560963/u0aled7/',
+  followup: '' // Add Follow Up webhook URL when created
+};
+
+function showSubmitModal(type) {
+  const booth = booths.find(b => b.id === currentBoothId);
+  if (!booth) return;
+  
+  const show = shows.find(s => s.id === currentShowId);
+  const isDemo = type === 'demo';
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal submit-modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Submit ${isDemo ? 'Demo Booked' : 'Follow Up'}</h2>
+        <button class="icon-btn close-modal-btn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="submit-form">
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" class="input" id="submit-company" value="${booth.companyName || ''}" readonly>
+        </div>
+        <div class="form-group">
+          <label>Avg Monthly Store Orders</label>
+          <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
+        </div>
+        <div class="form-group">
+          <label>AOV</label>
+          <input type="text" class="input" id="submit-aov" value="${booth.aov || ''}" placeholder="e.g., $50 - $100">
+        </div>
+        ${isDemo ? `
+        <div class="form-group">
+          <label>Demo Date</label>
+          <input type="datetime-local" class="input" id="submit-demo-date">
+        </div>
+        ` : ''}
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea class="input" id="submit-notes" rows="4" placeholder="Add any notes...">${booth.notes || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Your Name</label>
+          <select class="input" id="submit-rep">
+            ${reps.filter(r => {
+              const showReps = show?.reps || reps.map(rep => rep.id);
+              return showReps.includes(r.id);
+            }).map(r => `<option value="${r.id}" ${r.id === currentRepId ? 'selected' : ''}>${r.name}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn primary full" id="submit-webhook-btn">
+          <i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#submit-webhook-btn').addEventListener('click', async () => {
+    const repId = modal.querySelector('#submit-rep').value;
+    const repName = getRepName(repId);
+    const hubspotId = getHubSpotOwnerId(repId);
+    
+    const payload = {
+      companyName: modal.querySelector('#submit-company').value,
+      boothNumber: booth.boothNumber || '',
+      domain: booth.domain || '',
+      contactName: booth.contactName || '',
+      ordersPerMonth: modal.querySelector('#submit-orders').value,
+      aov: modal.querySelector('#submit-aov').value,
+      notes: modal.querySelector('#submit-notes').value,
+      repName: repName,
+      repHubSpotId: hubspotId,
+      showName: show?.name || '',
+      campaign: `${show?.name || 'Trade Show'} - 2026`,
+      hasBusinessCard: !!booth.businessCardData,
+      type: type
+    };
+    
+    if (isDemo) {
+      const demoDateInput = modal.querySelector('#submit-demo-date').value;
+      payload.demoDate = demoDateInput || '';
+    }
+    
+    const webhookUrl = WEBHOOK_URLS[type];
+    if (!webhookUrl) {
+      alert('Webhook URL not configured for ' + type);
+      return;
+    }
+    
+    try {
+      modal.querySelector('#submit-webhook-btn').disabled = true;
+      modal.querySelector('#submit-webhook-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+      
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        // Update booth status
+        if (isDemo) {
+          await setStatus(STATUS.DEMO_BOOKED);
+        } else if (booth.status === STATUS.NOT_VISITED) {
+          await setStatus(STATUS.FOLLOW_UP);
+        }
+        
+        // Update booth with latest values
+        booth.ordersPerMonth = payload.ordersPerMonth;
+        booth.aov = payload.aov;
+        booth.notes = payload.notes;
+        await saveBooth(booth);
+        
+        modal.remove();
+        alert(`${isDemo ? 'Demo' : 'Follow Up'} submitted successfully!`);
+      } else {
+        throw new Error('Failed to submit');
+      }
+    } catch (err) {
+      console.error('Webhook error:', err);
+      alert('Error submitting. Please try again or use Copy button.');
+      modal.querySelector('#submit-webhook-btn').disabled = false;
+      modal.querySelector('#submit-webhook-btn').innerHTML = `<i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}`;
+    }
+  });
 }
 
 function openSlack() {
