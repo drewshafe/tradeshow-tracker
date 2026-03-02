@@ -309,3 +309,27 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .rep-roster-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--card); border-radius: 8px; cursor: pointer; }
 .rep-roster-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--blue); }
 .rep-roster-item span { font-size: 14px; }
+
+/* App Select Modal */
+.app-select-modal .modal-content { padding: 20px; }
+.app-select-options { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.app-option-btn { padding: 12px 16px; background: var(--card); border: 2px solid var(--border); border-radius: 8px; cursor: pointer; text-align: center; }
+.app-option-btn.selected { border-color: var(--blue); background: rgba(59, 130, 246, 0.1); }
+.app-option-btn:hover { background: var(--bg); }
+.app-select-btn { background: var(--border); border: none; padding: 4px 8px; border-radius: 4px; color: var(--text-muted); font-size: 11px; cursor: pointer; }
+.app-toggle { cursor: pointer; }
+.app-toggle:hover { opacity: 0.8; }
+
+/* Submit Modal */
+.submit-modal .modal-content { max-width: 400px; }
+.submit-form { display: flex; flex-direction: column; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 13px; color: var(--text-muted); }
+.form-group .input { padding: 10px 12px; }
+.form-group textarea.input { resize: vertical; }
+
+/* Webhook Submit Buttons */
+.submit-btn.webhook { background: linear-gradient(135deg, #10b981, #059669); border-color: #059669; }
+.submit-btn.webhook:hover { background: linear-gradient(135deg, #059669, #047857); }
+.submit-btn.webhook.demo { background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-color: #7c3aed; }
+.submit-btn.webhook.demo:hover { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
