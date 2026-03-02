@@ -390,8 +390,14 @@
   // ============ DASHBOARD ============
   window.getDashboardStats = async function(showId) {
     const allBooths = await window.getAllBoothsForShow(showId);
-    const reps = await window.getReps();
+    const allReps = await window.getReps();
+    const shows = await window.getShows();
+    const show = shows.find(s => s.id === showId);
     const MIN_SALES_FOR_TO_VISIT = 300000; // $300k threshold for To Visit count
+    
+    // Filter reps by show roster (if defined)
+    const showRepIds = show?.reps || allReps.map(r => r.id);
+    const reps = allReps.filter(r => showRepIds.includes(r.id));
     
     const stats = reps.map(rep => {
       // Direct hit list items
