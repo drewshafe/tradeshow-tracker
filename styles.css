@@ -295,3 +295,17 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .shared-tabs-row { display: flex; gap: 8px; }
 .shared-tab-btn { padding: 8px 14px; background: var(--border); border: none; border-radius: 20px; color: var(--text-muted); font-size: 13px; cursor: pointer; }
 .shared-tab-btn.active { background: #2a3f5f; border: 1px solid var(--blue); color: var(--blue); }
+
+/* Admin Sections */
+.admin-section { background: var(--bg); padding: 16px; border-radius: 12px; }
+.admin-field { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.admin-field:last-of-type { border-bottom: none; }
+.admin-field label { color: var(--text-muted); font-size: 13px; }
+.admin-field span { font-size: 14px; }
+.admin-field .input { flex: 1; margin-left: 12px; }
+
+/* Rep Roster */
+.rep-roster-list { display: flex; flex-direction: column; gap: 8px; }
+.rep-roster-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--card); border-radius: 8px; cursor: pointer; }
+.rep-roster-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--blue); }
+.rep-roster-item span { font-size: 14px; }
