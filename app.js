@@ -988,14 +988,22 @@ async function exportDashboard() {
 function showAdminModal() { 
   document.getElementById('admin-modal').classList.remove('hidden'); 
   renderAdminTabs();
-  showAdminTab('shows'); 
+  // If a show is selected, show that show's settings by default
+  if (currentShowId) {
+    showAdminTab('current-show');
+  } else {
+    showAdminTab('shows'); 
+  }
 }
 function hideAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
 
 function renderAdminTabs() {
   const container = document.getElementById('admin-tabs');
+  const showSelected = !!currentShowId;
+  
   container.innerHTML = `
-    <button class="admin-tab active" data-tab="shows">Shows</button>
+    ${showSelected ? '<button class="admin-tab active" data-tab="current-show">This Show</button>' : ''}
+    <button class="admin-tab ${!showSelected ? 'active' : ''}" data-tab="shows">All Shows</button>
     <button class="admin-tab" data-tab="reps">Reps</button>
     <button class="admin-tab" data-tab="import">Import</button>
   `;
@@ -1011,7 +1019,70 @@ function renderAdminTabs() {
 function showAdminTab(tab) {
   const content = document.getElementById('admin-content');
   
-  if (tab === 'shows') {
+  if (tab === 'current-show') {
+    const show = shows.find(s => s.id === currentShowId);
+    if (!show) return showAdminTab('shows');
+    
+    const showReps = show.reps || show.reps || reps.map(r => r.id);
+    
+    content.innerHTML = `
+      <div class="admin-section">
+        <h3 style="margin-bottom: 16px;">${show.name}</h3>
+        <div class="admin-field">
+          <label>Location</label>
+          <span>${show.location || '-'}</span>
+        </div>
+        <div class="admin-field">
+          <label>Dates</label>
+          <span>${show.startDate || '-'} to ${show.endDate || '-'}</span>
+        </div>
+        <div class="admin-field">
+          <label>Exhibitor List URL</label>
+          <input type="text" class="input" id="show-exhibitor-url" value="${show.exhibitorList || show.exhibitor_list || ''}" placeholder="https://...">
+        </div>
+        <div class="admin-field">
+          <label>Aligned Room URL</label>
+          <input type="text" class="input" id="show-aligned-url" value="${show.alignedRoomUrl || show.aligned_room_url || ''}" placeholder="https://...">
+        </div>
+        <button class="btn secondary full" id="save-show-urls-btn" style="margin-top: 12px;"><i class="fas fa-save"></i> Save URLs</button>
+      </div>
+      
+      <div class="admin-section" style="margin-top: 24px;">
+        <h4 style="margin-bottom: 12px;">Reps Attending This Show</h4>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Unchecked reps won't appear in hit lists or dashboard for this show.</p>
+        <div class="rep-roster-list">
+          ${reps.map(r => `
+            <label class="rep-roster-item">
+              <input type="checkbox" class="rep-roster-checkbox" data-rep-id="${r.id}" ${showReps.includes(r.id) ? 'checked' : ''}>
+              <span>${r.name}</span>
+            </label>
+          `).join('')}
+        </div>
+        <button class="btn primary full" id="save-roster-btn" style="margin-top: 12px;"><i class="fas fa-save"></i> Save Rep Roster</button>
+      </div>
+    `;
+    
+    document.getElementById('save-show-urls-btn').addEventListener('click', async () => {
+      show.exhibitorList = document.getElementById('show-exhibitor-url').value;
+      show.exhibitor_list = show.exhibitorList;
+      show.alignedRoomUrl = document.getElementById('show-aligned-url').value;
+      show.aligned_room_url = show.alignedRoomUrl;
+      await saveShow(show);
+      shows = await getShows();
+      alert('URLs saved!');
+    });
+    
+    document.getElementById('save-roster-btn').addEventListener('click', async () => {
+      const checkedReps = Array.from(content.querySelectorAll('.rep-roster-checkbox:checked'))
+        .map(cb => cb.dataset.repId);
+      show.reps = checkedReps;
+      await saveShow(show);
+      shows = await getShows();
+      alert('Rep roster saved!');
+      renderRepList(); // Refresh rep list if visible
+    });
+    
+  } else if (tab === 'shows') {
     content.innerHTML = `
       <div class="admin-list">${shows.map(s => `<div class="admin-item"><span>${s.name}</span><span class="muted">${s.location || ''}</span></div>`).join('')}</div>
       <button class="btn primary full" id="add-show-btn"><i class="fas fa-plus"></i> Add Show</button>
@@ -1027,7 +1098,7 @@ function showAdminTab(tab) {
     content.innerHTML = `
       <div class="import-section">
         <label>Select Show</label>
-        <select id="import-show" class="input">${shows.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        <select id="import-show" class="input">${shows.map(s => `<option value="${s.id}" ${s.id === currentShowId ? 'selected' : ''}>${s.name}</option>`).join('')}</select>
         
         <label>List Type</label>
         <select id="import-list-type" class="input">
