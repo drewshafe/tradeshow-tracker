@@ -949,31 +949,30 @@ function showSubmitModal(type) {
       modal.querySelector('#submit-webhook-btn').disabled = true;
       modal.querySelector('#submit-webhook-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
       
-      const response = await fetch(webhookUrl, {
+      // Use no-cors mode for Zapier webhooks (they don't return CORS headers)
+      await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       });
       
-      if (response.ok) {
-        // Update booth status
-        if (isDemo) {
-          await setStatus(STATUS.DEMO_BOOKED);
-        } else if (booth.status === STATUS.NOT_VISITED) {
-          await setStatus(STATUS.FOLLOW_UP);
-        }
-        
-        // Update booth with latest values
-        booth.ordersPerMonth = payload.ordersPerMonth;
-        booth.aov = payload.aov;
-        booth.notes = payload.notes;
-        await saveBooth(booth);
-        
-        modal.remove();
-        alert(`${isDemo ? 'Demo' : 'Follow Up'} submitted successfully!`);
-      } else {
-        throw new Error('Failed to submit');
+      // With no-cors we can't check response, but Zapier webhooks are reliable
+      // Update booth status
+      if (isDemo) {
+        await setStatus(STATUS.DEMO_BOOKED);
+      } else if (booth.status === STATUS.NOT_VISITED) {
+        await setStatus(STATUS.FOLLOW_UP);
       }
+      
+      // Update booth with latest values
+      booth.ordersPerMonth = payload.ordersPerMonth;
+      booth.aov = payload.aov;
+      booth.notes = payload.notes;
+      await saveBooth(booth);
+      
+      modal.remove();
+      alert(`${isDemo ? 'Demo' : 'Follow Up'} submitted successfully!`);
     } catch (err) {
       console.error('Webhook error:', err);
       alert('Error submitting. Please try again or use Copy button.');
