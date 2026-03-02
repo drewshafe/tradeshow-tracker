@@ -8,8 +8,8 @@ let currentBoothId = null;
 let booths = [];
 let sortBy = 'booth';
 let searchQuery = '';
-let filters = { platform: 'all', protection: 'all', returns: 'all', minRevenue: 0, status: 'all' };
-let tempFilters = { ...filters };
+let filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all' };
+let tempFilters = { ...filters, platforms: [] };
 let pendingImportData = null;
 let columnMapping = {};
 let cameraStream = null;
@@ -23,6 +23,24 @@ function getAppBadge(appInstalled, productOffering) {
     return '<span class="app-badge shipinsure">ShipInsure</span>';
   }
   return '';
+}
+
+// Helper to get Aligned QR code section
+function getAlignedSection() {
+  const show = shows.find(s => s.id === currentShowId);
+  const alignedUrl = show?.alignedRoomUrl || show?.aligned_room_url;
+  if (!alignedUrl) return '';
+  
+  return `
+    <div class="section">
+      <div class="section-title">Aligned Room</div>
+      <div class="aligned-qr-container">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(alignedUrl)}" alt="Scan to enter Aligned room" class="aligned-qr">
+        <p class="aligned-hint">Have prospect scan to enter room</p>
+        <a href="${alignedUrl}" target="_blank" class="aligned-link"><i class="fas fa-external-link-alt"></i> Open Room</a>
+      </div>
+    </div>
+  `;
 }
 
 // Initialize
@@ -211,15 +229,12 @@ function renderShowList() {
 
 function renderShowTabs() {
   const container = document.getElementById('show-tabs');
+  const show = shows.find(s => s.id === currentShowId);
+  
   container.innerHTML = `
-    <button class="tab active" data-tab="reps">Reps</button>
-    <button class="tab" data-tab="master">Master</button>
-    <button class="tab" data-tab="customers">Customers</button>
-    <button class="tab" data-tab="working">Working</button>
-    <button class="tab" data-tab="opps">Opps</button>
-    <button class="tab" data-tab="inactive">Inactive</button>
+    <button class="tab active" data-tab="reps">Rep Hit Lists</button>
+    <button class="tab" data-tab="shared-lists">Shared Lists</button>
     <button class="tab" data-tab="people">People</button>
-    <button class="tab" data-tab="dashboard">Dashboard</button>
   `;
   
   container.querySelectorAll('.tab').forEach(btn => {
@@ -231,8 +246,8 @@ function renderShowTabs() {
       if (tab === 'reps') {
         currentRepId = null;
         renderRepList();
-      } else if (tab === 'dashboard') {
-        await showDashboard();
+      } else if (tab === 'shared-lists') {
+        renderSharedListsView();
       } else if (tab === 'people') {
         currentRepId = null;
         currentListType = LIST_TYPES.PEOPLE;
@@ -240,23 +255,58 @@ function renderShowTabs() {
         hideAllViews();
         document.getElementById('list-view').classList.add('active');
         updateListTitle();
-      } else {
-        currentRepId = null;
-        const typeMap = {
-          'master': LIST_TYPES.MASTER,
-          'customers': LIST_TYPES.CUSTOMERS,
-          'working': LIST_TYPES.WORKING,
-          'opps': LIST_TYPES.OPPS,
-          'inactive': LIST_TYPES.INACTIVE_CUSTOMERS
-        };
-        currentListType = typeMap[tab];
-        await loadBoothList();
-        hideAllViews();
-        document.getElementById('list-view').classList.add('active');
-        updateListTitle();
       }
     });
   });
+}
+
+function renderSharedListsView() {
+  const container = document.getElementById('rep-content');
+  const show = shows.find(s => s.id === currentShowId);
+  const gsLink = show?.exhibitorList || '#';
+  
+  container.innerHTML = `
+    <div class="shared-lists-container">
+      <a href="${gsLink}" target="_blank" class="gs-link-btn">
+        <i class="fas fa-external-link-alt"></i> Full ${show?.name || 'Show'} Exhibitor List
+      </a>
+      
+      <div class="shared-list-tabs">
+        <button class="shared-tab active" data-list="master">Master</button>
+        <button class="shared-tab" data-list="customers">Customers</button>
+        <button class="shared-tab" data-list="inactive">Inactive</button>
+        <button class="shared-tab" data-list="opps">Opps</button>
+        <button class="shared-tab" data-list="working">Working</button>
+      </div>
+      
+      <div id="shared-list-content"></div>
+    </div>
+  `;
+  
+  container.querySelectorAll('.shared-tab').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      container.querySelectorAll('.shared-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      const listType = btn.dataset.list;
+      
+      const typeMap = {
+        'master': LIST_TYPES.MASTER,
+        'customers': LIST_TYPES.CUSTOMERS,
+        'working': LIST_TYPES.WORKING,
+        'opps': LIST_TYPES.OPPS,
+        'inactive': LIST_TYPES.INACTIVE_CUSTOMERS
+      };
+      currentRepId = null;
+      currentListType = typeMap[listType];
+      await loadBoothList();
+      hideAllViews();
+      document.getElementById('list-view').classList.add('active');
+      updateListTitle();
+    });
+  });
+  
+  // Auto-click Master tab
+  container.querySelector('.shared-tab[data-list="master"]').click();
 }
 
 function renderRepList() {
@@ -353,9 +403,11 @@ function getFilteredBooths() {
     );
   }
 
-  if (filters.platform !== 'all') {
-    if (filters.platform === '[No Platform]') result = result.filter(b => !b.platform);
-    else result = result.filter(b => b.platform === filters.platform);
+  if (filters.platforms && filters.platforms.length > 0) {
+    result = result.filter(b => {
+      if (filters.platforms.includes('[No Platform]') && !b.platform) return true;
+      return filters.platforms.includes(b.platform);
+    });
   }
 
   if (filters.protection !== 'all') {
@@ -637,6 +689,8 @@ async function showDetailView(id) {
       </div>
       <button class="slack-btn" id="open-slack-btn"><i class="fab fa-slack"></i> Open Slack Workflow <i class="fas fa-external-link-alt" style="font-size:12px;opacity:0.6"></i></button>
     </div>
+
+    ${getAlignedSection()}
   `;
 
   // Attach event listeners
@@ -763,12 +817,14 @@ function hideFilterModal() {
 
 function renderFilterOptions() {
   const container = document.getElementById('filter-options');
+  const platformsSelected = tempFilters.platforms || [];
+  
   container.innerHTML = `
     <div class="filter-section">
-      <div class="filter-section-title">Platform</div>
+      <div class="filter-section-title">Platform (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${tempFilters.platform === 'all' ? 'active' : ''}" data-filter="platform" data-value="all">All</button>
-        ${PLATFORMS.map(p => `<button class="filter-option ${tempFilters.platform === p ? 'active' : ''}" data-filter="platform" data-value="${p}">${p}</button>`).join('')}
+        <button class="filter-option ${platformsSelected.length === 0 ? 'active' : ''}" data-filter="platforms" data-value="all">All</button>
+        ${PLATFORMS.map(p => `<button class="filter-option ${platformsSelected.includes(p) ? 'active' : ''}" data-filter="platforms" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -804,14 +860,30 @@ function renderFilterOptions() {
     btn.addEventListener('click', () => {
       const key = btn.dataset.filter;
       const value = btn.dataset.value;
-      tempFilters[key] = key === 'minRevenue' ? parseInt(value) : value;
+      
+      if (key === 'platforms') {
+        if (value === 'all') {
+          tempFilters.platforms = [];
+        } else {
+          const current = tempFilters.platforms || [];
+          if (current.includes(value)) {
+            tempFilters.platforms = current.filter(p => p !== value);
+          } else {
+            tempFilters.platforms = [...current, value];
+          }
+        }
+      } else if (key === 'minRevenue') {
+        tempFilters[key] = parseInt(value);
+      } else {
+        tempFilters[key] = value;
+      }
       renderFilterOptions();
     });
   });
 }
 
-function applyFilters() { filters = { ...tempFilters }; hideFilterModal(); renderBoothList(); }
-function clearFilters() { filters = { platform: 'all', protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters }; hideFilterModal(); renderBoothList(); }
+function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])] }; hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters, platforms: [] }; hideFilterModal(); renderBoothList(); }
 
 // ============ LIST ACTIONS ============
 
