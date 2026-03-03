@@ -876,6 +876,18 @@ function showSubmitModal(type) {
           <input type="text" class="input" id="submit-company" value="${booth.companyName || ''}" readonly>
         </div>
         <div class="form-group">
+          <label>Contact Name</label>
+          <input type="text" class="input" id="submit-contact-name" value="${booth.contactName || ''}" placeholder="e.g., John Smith">
+        </div>
+        <div class="form-group">
+          <label>Contact Email</label>
+          <input type="email" class="input" id="submit-contact-email" value="${booth.contactEmail || ''}" placeholder="e.g., john@company.com">
+        </div>
+        <div class="form-group">
+          <label>Contact Phone</label>
+          <input type="tel" class="input" id="submit-contact-phone" value="${booth.contactPhone || ''}" placeholder="e.g., 555-123-4567">
+        </div>
+        <div class="form-group">
           <label>Avg Monthly Store Orders</label>
           <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
         </div>
@@ -922,7 +934,9 @@ function showSubmitModal(type) {
       companyName: modal.querySelector('#submit-company').value,
       boothNumber: booth.boothNumber || '',
       domain: booth.domain || '',
-      contactName: booth.contactName || '',
+      contactName: modal.querySelector('#submit-contact-name').value,
+      contactEmail: modal.querySelector('#submit-contact-email').value,
+      contactPhone: modal.querySelector('#submit-contact-phone').value,
       ordersPerMonth: modal.querySelector('#submit-orders').value,
       aov: modal.querySelector('#submit-aov').value,
       notes: modal.querySelector('#submit-notes').value,
