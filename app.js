@@ -852,7 +852,7 @@ function copyForDemo() {
 // Webhook URLs
 const WEBHOOK_URLS = {
   demo: 'https://hooks.zapier.com/hooks/catch/17560963/u0aled7/',
-  followup: '' // Add Follow Up webhook URL when created
+  followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/'
 };
 
 function showSubmitModal(type) {
