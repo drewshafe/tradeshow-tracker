@@ -949,15 +949,35 @@ function showSubmitModal(type) {
       modal.querySelector('#submit-webhook-btn').disabled = true;
       modal.querySelector('#submit-webhook-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
       
-      // Send to webhook
-      fetch(webhookUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify(payload)
+      // Create a hidden iframe to submit to (avoids CORS)
+      const iframe = document.createElement('iframe');
+      iframe.name = 'zapier-submit-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      
+      // Create a form to submit
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = webhookUrl;
+      form.target = 'zapier-submit-frame';
+      
+      // Add all payload fields as hidden inputs
+      Object.entries(payload).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
       });
       
-      // Wait a moment for the request to go out
-      await new Promise(resolve => setTimeout(resolve, 500));
+      document.body.appendChild(form);
+      form.submit();
+      
+      // Clean up after a moment
+      setTimeout(() => {
+        form.remove();
+        iframe.remove();
+      }, 2000);
       
       // Update booth status
       if (isDemo) {
