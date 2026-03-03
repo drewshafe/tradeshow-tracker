@@ -67,6 +67,9 @@ function setupEventListeners() {
   document.getElementById('back-from-dashboard-btn').addEventListener('click', goToRepSelect);
   document.getElementById('export-btn').addEventListener('click', exportDashboard);
   
+  // Add Lead button
+  document.getElementById('add-lead-btn').addEventListener('click', showAddLeadModal);
+  
   // Filter modal
   document.getElementById('filter-btn').addEventListener('click', showFilterModal);
   document.getElementById('close-filter-btn').addEventListener('click', hideFilterModal);
@@ -1013,6 +1016,119 @@ function showSubmitModal(type) {
       alert('Error submitting. Please try again or use Copy button.');
       modal.querySelector('#submit-webhook-btn').disabled = false;
       modal.querySelector('#submit-webhook-btn').innerHTML = `<i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}`;
+    }
+  });
+}
+
+function showAddLeadModal() {
+  const show = shows.find(s => s.id === currentShowId);
+  const platformOptions = ['Shopify', 'Shopify Plus', 'BigCommerce', 'WooCommerce', 'Magento', 'Custom', 'Other', 'Unknown'];
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h2>Add New Lead</h2>
+        <button class="close-modal-btn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <h3 style="margin-bottom: 12px; font-size: 14px; color: #888;">Company Info</h3>
+        <div class="form-group">
+          <label>Company Name *</label>
+          <input type="text" class="input" id="add-company-name" placeholder="e.g., Acme Foods">
+        </div>
+        <div class="form-group">
+          <label>Booth Number</label>
+          <input type="text" class="input" id="add-booth-number" placeholder="e.g., 1234">
+        </div>
+        <div class="form-group">
+          <label>Domain</label>
+          <input type="text" class="input" id="add-domain" placeholder="e.g., acmefoods.com">
+        </div>
+        <div class="form-group">
+          <label>Platform</label>
+          <select class="input" id="add-platform">
+            <option value="">Select platform...</option>
+            ${platformOptions.map(p => `<option value="${p}">${p}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Est. Monthly Sales</label>
+          <input type="text" class="input" id="add-sales" placeholder="e.g., 50000">
+        </div>
+        
+        <h3 style="margin: 20px 0 12px; font-size: 14px; color: #888;">Contact Info</h3>
+        <div class="form-group">
+          <label>Contact Name</label>
+          <input type="text" class="input" id="add-contact-name" placeholder="e.g., John Smith">
+        </div>
+        <div class="form-group">
+          <label>Contact Email</label>
+          <input type="email" class="input" id="add-contact-email" placeholder="e.g., john@acmefoods.com">
+        </div>
+        <div class="form-group">
+          <label>Contact Phone</label>
+          <input type="tel" class="input" id="add-contact-phone" placeholder="e.g., 555-123-4567">
+        </div>
+        
+        <h3 style="margin: 20px 0 12px; font-size: 14px; color: #888;">Notes</h3>
+        <div class="form-group">
+          <textarea class="input" id="add-notes" rows="3" placeholder="Any additional notes..."></textarea>
+        </div>
+        
+        <button class="btn primary full" id="save-lead-btn">
+          <i class="fas fa-plus"></i> Add Lead
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#save-lead-btn').addEventListener('click', async () => {
+    const companyName = modal.querySelector('#add-company-name').value.trim();
+    if (!companyName) {
+      alert('Company name is required');
+      return;
+    }
+    
+    const newBooth = {
+      id: `manual-${Date.now()}`,
+      showId: currentShowId,
+      listType: LIST_TYPES.HIT_LIST,
+      repId: currentRepId,
+      companyName: companyName,
+      boothNumber: modal.querySelector('#add-booth-number').value.trim(),
+      domain: modal.querySelector('#add-domain').value.trim(),
+      platform: modal.querySelector('#add-platform').value,
+      estimatedMonthlySales: parseFloat(modal.querySelector('#add-sales').value.replace(/[^0-9.]/g, '')) || 0,
+      contactName: modal.querySelector('#add-contact-name').value.trim(),
+      contactEmail: modal.querySelector('#add-contact-email').value.trim(),
+      contactPhone: modal.querySelector('#add-contact-phone').value.trim(),
+      notes: modal.querySelector('#add-notes').value.trim(),
+      status: STATUS.NOT_VISITED,
+      isManualEntry: true,
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      modal.querySelector('#save-lead-btn').disabled = true;
+      modal.querySelector('#save-lead-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      
+      await saveBooth(newBooth);
+      booths.push(newBooth);
+      
+      modal.remove();
+      renderBoothList();
+      alert('Lead added successfully!');
+    } catch (err) {
+      console.error('Error saving lead:', err);
+      alert('Error saving lead. Please try again.');
+      modal.querySelector('#save-lead-btn').disabled = false;
+      modal.querySelector('#save-lead-btn').innerHTML = '<i class="fas fa-plus"></i> Add Lead';
     }
   });
 }
