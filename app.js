@@ -858,6 +858,18 @@ const WEBHOOK_URLS = {
   followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/'
 };
 
+// Get default task date (5 business days from now)
+function getDefaultTaskDate() {
+  const date = new Date();
+  let businessDays = 5;
+  while (businessDays > 0) {
+    date.setDate(date.getDate() + 1);
+    const day = date.getDay();
+    if (day !== 0 && day !== 6) businessDays--;
+  }
+  return date.toISOString().split('T')[0];
+}
+
 function showSubmitModal(type) {
   const booth = booths.find(b => b.id === currentBoothId);
   if (!booth) return;
@@ -903,7 +915,12 @@ function showSubmitModal(type) {
           <label>Demo Date</label>
           <input type="datetime-local" class="input" id="submit-demo-date">
         </div>
-        ` : ''}
+        ` : `
+        <div class="form-group">
+          <label>Follow Up Task Date</label>
+          <input type="date" class="input" id="submit-task-date" value="${getDefaultTaskDate()}">
+        </div>
+        `}
         <div class="form-group">
           <label>Notes</label>
           <textarea class="input" id="submit-notes" rows="4" placeholder="Add any notes...">${booth.notes || ''}</textarea>
@@ -955,6 +972,12 @@ function showSubmitModal(type) {
     if (isDemo) {
       const demoDateInput = modal.querySelector('#submit-demo-date').value;
       payload.demoDate = demoDateInput || '';
+    } else {
+      // Follow up - add task date with 9:00 AM MST
+      const taskDateInput = modal.querySelector('#submit-task-date').value;
+      if (taskDateInput) {
+        payload.taskDate = `${taskDateInput}T09:00:00-07:00`; // 9:00 AM MST
+      }
     }
     
     const webhookUrl = WEBHOOK_URLS[type];
