@@ -948,6 +948,7 @@ function showSubmitModal(type) {
       showName: show?.name || '',
       campaign: `${show?.name || 'Trade Show'} - 2026`,
       hasBusinessCard: !!booth.businessCardData,
+      businessCardUrl: booth.businessCardUrl || '',
       type: type
     };
     
@@ -1157,7 +1158,27 @@ async function capturePhoto() {
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
   const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-  await updateBoothField('businessCardData', dataUrl);
+  
+  // Show uploading indicator
+  const captureBtn = document.getElementById('capture-btn');
+  const originalText = captureBtn.innerHTML;
+  captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+  captureBtn.disabled = true;
+  
+  // Upload to Supabase Storage and get URL
+  const imageUrl = await uploadBusinessCard(dataUrl, currentBoothId);
+  
+  if (imageUrl) {
+    await updateBoothField('businessCardUrl', imageUrl);
+    await updateBoothField('businessCardData', dataUrl); // Keep local preview
+  } else {
+    // Fallback to just storing base64 locally
+    await updateBoothField('businessCardData', dataUrl);
+  }
+  
+  captureBtn.innerHTML = originalText;
+  captureBtn.disabled = false;
+  
   closeCameraModal();
   showDetailView(currentBoothId);
 }
