@@ -432,6 +432,46 @@
     return stats;
   };
 
+  // ============ IMAGE UPLOAD ============
+  window.uploadBusinessCard = async function(base64Data, boothId) {
+    if (!useSupabase || !sbClient) {
+      console.warn('Supabase not available for image upload');
+      return null;
+    }
+    
+    try {
+      // Convert base64 to blob
+      const base64Response = await fetch(base64Data);
+      const blob = await base64Response.blob();
+      
+      // Generate unique filename
+      const filename = `business-cards/${boothId}-${Date.now()}.jpg`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await sbClient.storage
+        .from('tradeshow-images')
+        .upload(filename, blob, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+      
+      if (error) {
+        console.error('Upload error:', error);
+        return null;
+      }
+      
+      // Get public URL
+      const { data: urlData } = sbClient.storage
+        .from('tradeshow-images')
+        .getPublicUrl(filename);
+      
+      return urlData.publicUrl;
+    } catch (err) {
+      console.error('Error uploading business card:', err);
+      return null;
+    }
+  };
+
   // ============ EXPORT ============
   window.exportToCSV = async function(showId, repId, listType) {
     const booths = repId ? await window.getBooths(showId, repId, listType) : await window.getAllBoothsForShow(showId);
