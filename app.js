@@ -885,58 +885,67 @@ function showSubmitModal(type) {
         <h2>Submit ${isDemo ? 'Demo Booked' : 'Follow Up'}</h2>
         <button class="icon-btn close-modal-btn"><i class="fas fa-times"></i></button>
       </div>
-      <div class="submit-form">
-        <div class="form-group">
-          <label>Company Name</label>
-          <input type="text" class="input" id="submit-company" value="${booth.companyName || ''}" readonly>
+      <div class="modal-body">
+        <div class="submit-form">
+          <!-- Rep & Submit at top -->
+          <div class="form-group">
+            <label>Your Name</label>
+            <select class="input" id="submit-rep">
+              ${reps.filter(r => {
+                const showReps = show?.reps || reps.map(rep => rep.id);
+                return showReps.includes(r.id);
+              }).map(r => `<option value="${r.id}" ${r.id === currentRepId ? 'selected' : ''}>${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn primary full" id="submit-webhook-btn" style="margin-top: 8px; margin-bottom: 16px;">
+            <i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}
+          </button>
+          
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 0 16px;">
+          
+          <!-- Date field -->
+          ${isDemo ? `
+          <div class="form-group">
+            <label>Demo Date</label>
+            <input type="datetime-local" class="input" id="submit-demo-date">
+          </div>
+          ` : `
+          <div class="form-group">
+            <label>Follow Up Task Date</label>
+            <input type="date" class="input" id="submit-task-date" value="${getDefaultTaskDate()}">
+          </div>
+          `}
+          
+          <!-- Lead data below -->
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" class="input" id="submit-company" value="${booth.companyName || ''}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" class="input" id="submit-contact-name" value="${booth.contactName || ''}" placeholder="e.g., John Smith">
+          </div>
+          <div class="form-group">
+            <label>Contact Email</label>
+            <input type="email" class="input" id="submit-contact-email" value="${booth.contactEmail || ''}" placeholder="e.g., john@company.com">
+          </div>
+          <div class="form-group">
+            <label>Contact Phone</label>
+            <input type="tel" class="input" id="submit-contact-phone" value="${booth.contactPhone || ''}" placeholder="e.g., 555-123-4567">
+          </div>
+          <div class="form-group">
+            <label>Avg Monthly Store Orders</label>
+            <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
+          </div>
+          <div class="form-group">
+            <label>AOV</label>
+            <input type="text" class="input" id="submit-aov" value="${booth.aov || ''}" placeholder="e.g., $50 - $100">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea class="input" id="submit-notes" rows="3" placeholder="Add any notes...">${booth.notes || ''}</textarea>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Contact Name</label>
-          <input type="text" class="input" id="submit-contact-name" value="${booth.contactName || ''}" placeholder="e.g., John Smith">
-        </div>
-        <div class="form-group">
-          <label>Contact Email</label>
-          <input type="email" class="input" id="submit-contact-email" value="${booth.contactEmail || ''}" placeholder="e.g., john@company.com">
-        </div>
-        <div class="form-group">
-          <label>Contact Phone</label>
-          <input type="tel" class="input" id="submit-contact-phone" value="${booth.contactPhone || ''}" placeholder="e.g., 555-123-4567">
-        </div>
-        <div class="form-group">
-          <label>Avg Monthly Store Orders</label>
-          <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
-        </div>
-        <div class="form-group">
-          <label>AOV</label>
-          <input type="text" class="input" id="submit-aov" value="${booth.aov || ''}" placeholder="e.g., $50 - $100">
-        </div>
-        ${isDemo ? `
-        <div class="form-group">
-          <label>Demo Date</label>
-          <input type="datetime-local" class="input" id="submit-demo-date">
-        </div>
-        ` : `
-        <div class="form-group">
-          <label>Follow Up Task Date</label>
-          <input type="date" class="input" id="submit-task-date" value="${getDefaultTaskDate()}">
-        </div>
-        `}
-        <div class="form-group">
-          <label>Notes</label>
-          <textarea class="input" id="submit-notes" rows="4" placeholder="Add any notes...">${booth.notes || ''}</textarea>
-        </div>
-        <div class="form-group">
-          <label>Your Name</label>
-          <select class="input" id="submit-rep">
-            ${reps.filter(r => {
-              const showReps = show?.reps || reps.map(rep => rep.id);
-              return showReps.includes(r.id);
-            }).map(r => `<option value="${r.id}" ${r.id === currentRepId ? 'selected' : ''}>${r.name}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn primary full" id="submit-webhook-btn">
-          <i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}
-        </button>
       </div>
     </div>
   `;
