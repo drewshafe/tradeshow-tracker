@@ -81,10 +81,14 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); c
 .booth-item:active { transform: scale(0.98); }
 .booth-left { display: flex; align-items: center; width: 70px; gap: 8px; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; }
-.status-dot.not_visited { background: var(--red); }
-.status-dot.follow_up { background: var(--yellow); }
+.status-dot.not_visited { background: var(--text-muted); }
+.status-dot.come_back { background: #ffa500; }
+.status-dot.follow_up_warm { background: #ff6b6b; }
+.status-dot.follow_up_cold { background: var(--blue); }
 .status-dot.demo_booked { background: var(--green); }
-.status-dot.dq { background: var(--text-muted); }
+.status-dot.not_interested { background: #9333ea; }
+.status-dot.dq { background: #555; }
+.status-dot.not_at_show { background: #78716c; }
 .booth-number { font-size: 14px; font-weight: 600; }
 .booth-center { flex: 1; margin: 0 10px; overflow: hidden; }
 .company-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -151,13 +155,17 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); c
 .section-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; }
 
 /* Status Buttons */
-.status-buttons { display: flex; gap: 8px; }
-.status-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+.status-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.status-btn { flex: 1 1 calc(25% - 6px); min-width: 70px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 8px; cursor: pointer; }
 .status-btn i { font-size: 14px; }
-.status-btn.active.not_visited { background: rgba(255,107,107,0.2); border-color: var(--red); color: var(--red); }
-.status-btn.active.follow_up { background: rgba(255,217,61,0.2); border-color: var(--yellow); color: var(--yellow); }
+.status-btn.active.not_visited { background: rgba(136,136,136,0.2); border-color: var(--text-muted); color: var(--text-muted); }
+.status-btn.active.come_back { background: rgba(255,165,0,0.2); border-color: #ffa500; color: #ffa500; }
+.status-btn.active.follow_up_warm { background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b; }
+.status-btn.active.follow_up_cold { background: rgba(77,171,247,0.2); border-color: var(--blue); color: var(--blue); }
 .status-btn.active.demo_booked { background: rgba(107,203,119,0.2); border-color: var(--green); color: var(--green); }
-.status-btn.active.dq { background: rgba(136,136,136,0.2); border-color: var(--text-muted); color: var(--text-muted); }
+.status-btn.active.not_interested { background: rgba(147,51,234,0.2); border-color: #9333ea; color: #9333ea; }
+.status-btn.active.dq { background: rgba(80,80,80,0.2); border-color: #555; color: #555; }
+.status-btn.active.not_at_show { background: rgba(120,113,108,0.2); border-color: #78716c; color: #78716c; }
 
 /* Form Elements */
 .input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; color: var(--text); font-size: 15px; outline: none; }
@@ -344,3 +352,159 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .submit-btn.webhook:hover { background: linear-gradient(135deg, #059669, #047857); }
 .submit-btn.webhook.demo { background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-color: #7c3aed; }
 .submit-btn.webhook.demo:hover { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+
+/* Calendar Embed */
+.calendar-embed-container {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.calendar-iframe {
+  width: 100%;
+  min-height: 500px;
+  border: none;
+}
+
+/* Files Section */
+.files-container { margin-top: 8px; }
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.file-item {
+  position: relative;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.file-item:active { transform: scale(0.98); }
+.file-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.file-icon {
+  font-size: 32px;
+  color: var(--red);
+}
+.file-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.7);
+  padding: 4px 6px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(255,107,107,0.9);
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty-files {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+.upload-files-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--border);
+  border: 2px dashed var(--text-dim);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.upload-files-btn:active { background: var(--card); }
+
+/* Hall Badge */
+.hall-badge {
+  display: block;
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.hall-badge-detail {
+  font-size: 11px;
+  color: var(--blue);
+  margin-left: 8px;
+}
+
+/* Social Stats */
+.social-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+.social-stats i {
+  margin-right: 2px;
+}
+.social-stats .fa-instagram { color: #E1306C; }
+.social-stats .fa-facebook { color: #1877F2; }
+
+.detail-social {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+.social-item {
+  font-size: 13px;
+  color: var(--text);
+}
+.social-item i {
+  margin-right: 4px;
+}
+.social-item .fa-instagram { color: #E1306C; }
+.social-item .fa-facebook { color: #1877F2; }
+
+/* Detail Links */
+.detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+}
+.detail-link:active { opacity: 0.8; }
+.detail-link i { font-size: 14px; }
+.detail-link.hubspot { background: rgba(255,122,89,0.2); color: #FF7A59; }
+.detail-link.storeleads { background: rgba(77,171,247,0.2); color: var(--blue); }
