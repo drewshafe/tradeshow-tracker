@@ -8,7 +8,8 @@ let currentBoothId = null;
 let booths = [];
 let sortBy = 'booth';
 let searchQuery = '';
-let filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' };
+const DEFAULT_FILTERS = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' };
+let filters = { ...DEFAULT_FILTERS };
 let tempFilters = { ...filters, platforms: [] };
 let pendingImportData = null;
 let columnMapping = {};
@@ -24,8 +25,43 @@ const HALL_OPTIONS = [
   { value: 'Hall D', label: 'Hall D' },
   { value: 'Hall E', label: 'Hall E (Lower)' },
   { value: 'North Hall', label: 'North Hall' },
+  { value: 'Plaza', label: 'Plaza' },
   { value: 'Level 3', label: 'Level 3' }
 ];
+
+// Filter persistence helpers
+function getFilterStorageKey() {
+  return `tst_filters_${currentShowId}_${currentRepId}_${currentListType}`;
+}
+
+function saveFilters() {
+  if (!currentShowId || !currentRepId) return;
+  try {
+    localStorage.setItem(getFilterStorageKey(), JSON.stringify(filters));
+    localStorage.setItem(`tst_sortBy_${currentShowId}_${currentRepId}`, sortBy);
+  } catch (e) { console.warn('Could not save filters:', e); }
+}
+
+function loadFilters() {
+  if (!currentShowId || !currentRepId) return;
+  try {
+    const saved = localStorage.getItem(getFilterStorageKey());
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      filters = { ...DEFAULT_FILTERS, ...parsed };
+      tempFilters = { ...filters, platforms: [...(filters.platforms || [])] };
+    } else {
+      filters = { ...DEFAULT_FILTERS };
+      tempFilters = { ...filters, platforms: [] };
+    }
+    const savedSort = localStorage.getItem(`tst_sortBy_${currentShowId}_${currentRepId}`);
+    if (savedSort) sortBy = savedSort;
+  } catch (e) { 
+    console.warn('Could not load filters:', e);
+    filters = { ...DEFAULT_FILTERS };
+    tempFilters = { ...filters, platforms: [] };
+  }
+}
 
 // Helper to get app badge (EcoCart or ShipInsure)
 function getAppBadge(appInstalled, productOffering) {
@@ -248,6 +284,7 @@ function setupEventListeners() {
       document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       sortBy = btn.dataset.sort;
+      saveFilters();
       renderBoothList();
     });
   });
@@ -291,6 +328,7 @@ function goToRepSelect() {
 async function selectRep(repId) {
   currentRepId = repId;
   currentListType = LIST_TYPES.HIT_LIST;
+  loadFilters(); // Restore saved filters for this rep
   // Hide shared tabs bar for hit lists
   document.getElementById('shared-list-tabs-bar').classList.add('hidden');
   await loadBoothList();
@@ -301,6 +339,7 @@ async function selectRep(repId) {
 
 async function selectListType(listType) {
   currentListType = listType;
+  loadFilters(); // Restore saved filters for this list type
   await loadBoothList();
   hideAllViews();
   document.getElementById('list-view').classList.add('active');
@@ -799,6 +838,7 @@ function renderActiveFilters() {
         if (key === 'minRevenue') filters[key] = 0;
         else if (key === 'platforms') filters[key] = [];
         else filters[key] = 'all';
+        saveFilters();
         renderBoothList();
       });
     });
@@ -969,7 +1009,7 @@ async function showDetailView(id) {
       <div class="section-title">Business Card</div>
       <div id="card-container">
         ${booth.businessCardData 
-          ? `<div class="card-preview"><img src="${booth.businessCardData}" alt="Card"><div class="card-actions"><button class="card-action" id="retake-card-btn"><i class="fas fa-camera"></i> Retake</button><button class="card-action danger" id="remove-card-btn"><i class="fas fa-trash"></i> Remove</button></div></div>`
+          ? `<div class="card-preview"><img src="${booth.businessCardData}" alt="Card"><div class="card-actions"><button class="card-action" id="retake-card-btn"><i class="fas fa-camera"></i> Retake</button><button class="card-action scan" id="scan-card-btn"><i class="fas fa-magic"></i> Scan OCR</button><button class="card-action danger" id="remove-card-btn"><i class="fas fa-trash"></i> Remove</button></div></div>`
           : `<button class="capture-card-btn" id="capture-card-btn"><i class="fas fa-camera"></i> Capture Business Card</button>`}
       </div>
     </div>
@@ -1011,6 +1051,7 @@ async function showDetailView(id) {
   
   document.getElementById('capture-card-btn')?.addEventListener('click', openCamera);
   document.getElementById('retake-card-btn')?.addEventListener('click', openCamera);
+  document.getElementById('scan-card-btn')?.addEventListener('click', scanBusinessCard);
   document.getElementById('remove-card-btn')?.addEventListener('click', removeCard);
   
   document.getElementById('copy-followup-btn').addEventListener('click', copyForFollowUp);
@@ -1096,6 +1137,108 @@ const WEBHOOK_URLS = {
   demo: 'https://hooks.zapier.com/hooks/catch/17560963/u0aled7/',
   followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/'
 };
+
+// Anthropic API Key for OCR
+const ANTHROPIC_API_KEY = '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';
+
+// OCR Business Card using Claude Vision
+async function scanBusinessCard() {
+  const booth = booths.find(b => b.id === currentBoothId);
+  if (!booth || !booth.businessCardData) {
+    alert('No business card image to scan');
+    return;
+  }
+  
+  const btn = document.getElementById('scan-card-btn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+  btn.disabled = true;
+  
+  try {
+    // Extract base64 data from data URL
+    const base64Data = booth.businessCardData.split(',')[1];
+    const mediaType = booth.businessCardData.split(';')[0].split(':')[1] || 'image/jpeg';
+    
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: base64Data
+              }
+            },
+            {
+              type: 'text',
+              text: 'Extract contact information from this business card. Return ONLY a JSON object with these fields (use null for missing info): {"name": "full name", "email": "email address", "phone": "phone number", "title": "job title", "company": "company name"}. Return only the JSON, no other text.'
+            }
+          ]
+        }]
+      })
+    });
+    
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API error: ${response.status} - ${errText}`);
+    }
+    
+    const data = await response.json();
+    const text = data.content[0].text;
+    
+    // Parse JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not parse OCR response');
+    
+    const extracted = JSON.parse(jsonMatch[0]);
+    
+    // Update fields
+    if (extracted.name) {
+      booth.contactName = extracted.name;
+      document.getElementById('contact-name').value = extracted.name;
+    }
+    if (extracted.email) {
+      booth.contactEmail = extracted.email;
+    }
+    if (extracted.phone) {
+      booth.contactPhone = extracted.phone;
+    }
+    if (extracted.title) {
+      booth.contactTitle = extracted.title;
+    }
+    
+    await saveBooth(booth);
+    
+    // Show success with extracted info
+    const summary = [
+      extracted.name && `Name: ${extracted.name}`,
+      extracted.email && `Email: ${extracted.email}`,
+      extracted.phone && `Phone: ${extracted.phone}`,
+      extracted.title && `Title: ${extracted.title}`
+    ].filter(Boolean).join('\n');
+    
+    alert(`Card scanned successfully!\n\n${summary || 'No contact info found'}`);
+    
+  } catch (err) {
+    console.error('OCR error:', err);
+    alert('Error scanning card: ' + err.message);
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
 
 // Get default task date (5 business days from now)
 function getDefaultTaskDate() {
@@ -1616,8 +1759,8 @@ function renderFilterOptions() {
   });
 }
 
-function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])] }; hideFilterModal(); renderBoothList(); }
-function clearFilters() { filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' }; tempFilters = { ...filters, platforms: [] }; hideFilterModal(); renderBoothList(); }
+function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])] }; saveFilters(); hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { ...DEFAULT_FILTERS }; tempFilters = { ...filters, platforms: [] }; saveFilters(); hideFilterModal(); renderBoothList(); }
 
 // ============ LIST ACTIONS ============
 
