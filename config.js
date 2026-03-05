@@ -5,16 +5,36 @@ const SUPABASE_ANON_KEY = 'sb_publishable_uKmMzyUx5EkAs8GmETBTgw_e2WsKTNn';
 // Status Options
 const STATUS = {
   NOT_VISITED: 'not_visited',
-  FOLLOW_UP: 'follow_up',
+  COME_BACK: 'come_back',
+  FOLLOW_UP_WARM: 'follow_up_warm',
+  FOLLOW_UP_COLD: 'follow_up_cold',
   DEMO_BOOKED: 'demo_booked',
-  DQ: 'dq'
+  NOT_INTERESTED: 'not_interested',
+  DQ: 'dq',
+  NOT_AT_SHOW: 'not_at_show'
 };
 
 const STATUS_LABELS = {
   [STATUS.NOT_VISITED]: 'Not Visited',
-  [STATUS.FOLLOW_UP]: 'Follow Up',
+  [STATUS.COME_BACK]: 'Come Back',
+  [STATUS.FOLLOW_UP_WARM]: 'Warm Follow Up',
+  [STATUS.FOLLOW_UP_COLD]: 'Cold Follow Up',
   [STATUS.DEMO_BOOKED]: 'Demo Booked',
-  [STATUS.DQ]: 'DQ'
+  [STATUS.NOT_INTERESTED]: 'Not Interested',
+  [STATUS.DQ]: 'DQ',
+  [STATUS.NOT_AT_SHOW]: 'Not at Show'
+};
+
+// Status sort priority (lower = higher priority)
+const STATUS_PRIORITY = {
+  [STATUS.COME_BACK]: 1,
+  [STATUS.NOT_VISITED]: 2,
+  [STATUS.FOLLOW_UP_WARM]: 3,
+  [STATUS.FOLLOW_UP_COLD]: 4,
+  [STATUS.DEMO_BOOKED]: 5,
+  [STATUS.NOT_INTERESTED]: 6,
+  [STATUS.DQ]: 7,
+  [STATUS.NOT_AT_SHOW]: 8
 };
 
 // Form Options
