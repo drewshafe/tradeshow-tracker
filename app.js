@@ -747,8 +747,10 @@ function renderBoothList(preserveScroll = false) {
     const hallInfo = getBoothHall(b.boothNumber);
     const igFollowers = formatFollowers(b.instagramFollowers || b.instagram_followers);
     const fbFollowers = formatFollowers(b.facebookFollowers || b.facebook_followers);
+    const visits = formatFollowers(b.monthlyVisits || b.monthly_visits);
     const socialDisplay = (igFollowers || fbFollowers) ? 
       `<span class="social-stats">${igFollowers ? `<i class="fab fa-instagram"></i>${igFollowers}` : ''}${fbFollowers ? ` <i class="fab fa-facebook"></i>${fbFollowers}` : ''}</span>` : '';
+    const visitsDisplay = visits ? `<span class="visits-stats"><i class="fas fa-eye"></i>${visits}</span>` : '';
     
     return `
     <div class="booth-item ${config.hasDetail ? '' : 'no-click'}" data-booth-id="${b.id}">
@@ -766,6 +768,7 @@ function renderBoothList(preserveScroll = false) {
           <span>${b.platform || 'No platform'}</span>
           ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
           ${socialDisplay}
+          ${visitsDisplay}
           ${ownerDisplay}
         </div>
       </div>
@@ -933,6 +936,7 @@ async function showDetailView(id) {
   const hallInfo = getBoothHall(booth.boothNumber);
   const igFollowers = formatFollowers(booth.instagramFollowers || booth.instagram_followers);
   const fbFollowers = formatFollowers(booth.facebookFollowers || booth.facebook_followers);
+  const visits = formatFollowers(booth.monthlyVisits || booth.monthly_visits);
 
   document.getElementById('detail-company').textContent = booth.companyName || 'Unknown';
   
@@ -950,10 +954,17 @@ async function showDetailView(id) {
         ${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
         ${booth.returns ? ` • Returns: ${booth.returns}` : ''}
       </div>
-      ${(igFollowers || fbFollowers) ? `
+      ${(igFollowers || fbFollowers || visits) ? `
       <div class="detail-social">
         ${igFollowers ? `<span class="social-item"><i class="fab fa-instagram"></i> ${igFollowers}</span>` : ''}
         ${fbFollowers ? `<span class="social-item"><i class="fab fa-facebook"></i> ${fbFollowers}</span>` : ''}
+        ${visits ? `<span class="social-item"><i class="fas fa-eye"></i> ${visits} visits/mo</span>` : ''}
+      </div>
+      ` : ''}
+      ${(booth.techInstalls || booth.competitorUninstalls) ? `
+      <div class="detail-tech">
+        ${booth.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> Tech: ${booth.techInstalls}</span>` : ''}
+        ${booth.competitorUninstalls ? `<span class="tech-item uninstall"><i class="fas fa-trash-alt"></i> Uninstalls: ${booth.competitorUninstalls}</span>` : ''}
       </div>
       ` : ''}
       ${booth.tag ? `<span class="detail-tag ${booth.tag.toLowerCase()}">${booth.tag}</span>` : ''}
@@ -2111,13 +2122,15 @@ function showMapperModal() {
         recordId: ['record id', 'record_id', 'id', 'hubspot id'],
         competitorInstalls: ['competitor tracking - installs', 'competitor installs', 'protection installs'],
         competitorUninstalls: ['competitor tracking - uninstalls', 'competitor uninstalls', 'protection uninstalls'],
+        techInstalls: ['tech tracking - installs', 'tech installs', 'technology installs', 'tech tracking'],
         instagramFollowers: ['instagram followers', 'ig followers', 'instagram'],
         facebookFollowers: ['facebook followers', 'fb followers', 'facebook'],
+        monthlyVisits: ['estimated monthly visits', 'monthly visits', 'visits', 'traffic'],
         hubspotUrl: ['hubspot company url', 'hubspot url', 'company url', 'hubspot link', 'hs url'],
       };
       
       const patterns = variations[field.key] || [];
-      found = headerLower.findIndex(h => patterns.some(p => h.includes(p) || p.includes(h)));
+      found = headerLower.findIndex(h => patterns.some(p => h.trim() === p.trim() || h.includes(p) || p.includes(h)));
     }
     
     if (found >= 0) columnMapping[field.key] = found;
