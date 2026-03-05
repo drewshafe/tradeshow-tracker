@@ -466,23 +466,52 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .social-stats {
   font-size: 11px;
   color: var(--text-muted);
-  margin-left: 8px;
+  margin-left: 4px;
 }
 .social-stats i {
   margin-right: 2px;
 }
 .social-stats .fa-instagram { color: #E1306C; }
 .social-stats .fa-facebook { color: #1877F2; }
+.visits-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.visits-stats i {
+  margin-right: 2px;
+  color: #9ca3af;
+}
 
 .detail-social {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 8px;
 }
 .social-item {
   font-size: 13px;
   color: var(--text);
 }
+.social-item i { margin-right: 4px; }
+.social-item .fa-instagram { color: #E1306C; }
+.social-item .fa-facebook { color: #1877F2; }
+.social-item .fa-eye { color: #9ca3af; }
+
+.detail-tech {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.tech-item {
+  color: var(--blue);
+}
+.tech-item.uninstall {
+  color: var(--green);
+}
+.tech-item i { margin-right: 4px; }
 .social-item i {
   margin-right: 4px;
 }
