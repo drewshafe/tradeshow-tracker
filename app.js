@@ -2148,6 +2148,20 @@ function renderMapperContent() {
   
   container.innerHTML = `
     <p class="hint">Map your columns to the required fields for <strong>${LIST_LABELS[listType]}</strong>:</p>
+    
+    <div class="import-mode-toggle">
+      <label class="toggle-option">
+        <input type="radio" name="import-mode" value="replace" checked>
+        <span>Replace All</span>
+        <small>Clear existing data, import fresh</small>
+      </label>
+      <label class="toggle-option">
+        <input type="radio" name="import-mode" value="merge">
+        <span>Merge / Enrich</span>
+        <small>Update existing booths, keep status & notes</small>
+      </label>
+    </div>
+    
     <div class="mapper-grid">
       ${fields.map(field => `
         <div class="mapper-row">
@@ -2178,6 +2192,7 @@ async function confirmMapping() {
   try {
     const listType = document.getElementById('import-list-type').value;
     const fields = CSV_FIELDS[listType] || CSV_FIELDS[LIST_TYPES.HIT_LIST];
+    const importMode = document.querySelector('input[name="import-mode"]:checked')?.value || 'replace';
     
     // Check required fields
     const requiredFields = fields.filter(f => f.required);
@@ -2190,7 +2205,7 @@ async function confirmMapping() {
     const showId = document.getElementById('import-show').value;
     const repId = listType === LIST_TYPES.HIT_LIST ? (document.getElementById('import-rep').value || null) : null;
     
-    console.log('Import settings:', { showId, repId, listType });
+    console.log('Import settings:', { showId, repId, listType, importMode });
     console.log('Column mapping:', columnMapping);
     
     const { lines } = pendingImportData;
@@ -2227,27 +2242,155 @@ async function confirmMapping() {
     }
     
     // Handle booth-based lists
+    const getValue = (vals, key) => columnMapping[key] !== undefined ? (vals[columnMapping[key]] || '') : '';
+    const getNumeric = (vals, key) => {
+      const val = getValue(vals, key);
+      return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
+    };
+    
+    // MERGE MODE: Update existing booths
+    if (importMode === 'merge') {
+      // Load existing booths for this list
+      const existingBooths = await getBoothsForList(showId, repId, listType);
+      console.log('Existing booths:', existingBooths.length);
+      
+      let updated = 0;
+      let added = 0;
+      let skipped = 0;
+      
+      // Fields that should NEVER be overwritten in merge mode
+      const protectedFields = ['status', 'notes', 'contactName', 'contactEmail', 'contactPhone', 
+                               'contactTitle', 'ordersPerMonth', 'aov', 'businessCardData', 
+                               'claimedBy', 'tag', 'id', 'showId', 'repId', 'listType'];
+      
+      // Fields that CAN be enriched (only if currently empty)
+      const enrichableFields = ['boothNumber', 'domain', 'estimatedMonthlySales', 'platform', 
+                                'protection', 'returns', 'recordId', 'ownerId', 'lastContacted',
+                                'campaign', 'competitorInstalls', 'competitorUninstalls', 'techInstalls',
+                                'instagramFollowers', 'facebookFollowers', 'monthlyVisits', 'hubspotUrl',
+                                'associatedDeal', 'associatedDealIds', 'dealRecordId', 'dealName',
+                                'appInstalled', 'productOffering'];
+      
+      for (const vals of lines) {
+        const csvCompanyName = getValue(vals, 'companyName')?.trim().toLowerCase();
+        const csvDomain = getValue(vals, 'domain')?.trim().toLowerCase();
+        
+        if (!csvCompanyName) {
+          skipped++;
+          continue;
+        }
+        
+        // Find matching existing booth by company name OR domain
+        const existingBooth = existingBooths.find(b => {
+          const existingName = (b.companyName || '').trim().toLowerCase();
+          const existingDomain = (b.domain || '').trim().toLowerCase();
+          return existingName === csvCompanyName || 
+                 (csvDomain && existingDomain && existingDomain === csvDomain);
+        });
+        
+        if (existingBooth) {
+          // Merge: only fill in empty fields
+          let hasChanges = false;
+          
+          for (const field of enrichableFields) {
+            const currentVal = existingBooth[field];
+            const isEmpty = currentVal === undefined || currentVal === null || currentVal === '' || currentVal === 0;
+            
+            if (isEmpty) {
+              let newVal;
+              if (['estimatedMonthlySales', 'instagramFollowers', 'facebookFollowers', 'monthlyVisits'].includes(field)) {
+                newVal = getNumeric(vals, field);
+              } else {
+                newVal = getValue(vals, field);
+              }
+              
+              if (newVal && newVal !== 0 && newVal !== '') {
+                existingBooth[field] = newVal;
+                hasChanges = true;
+              }
+            }
+          }
+          
+          if (hasChanges) {
+            await saveBooth(existingBooth);
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // New booth - add it
+          const booth = {
+            id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            showId,
+            repId,
+            listType,
+            companyName: getValue(vals, 'companyName'),
+            boothNumber: getValue(vals, 'boothNumber'),
+            domain: getValue(vals, 'domain'),
+            estimatedMonthlySales: getNumeric(vals, 'estimatedMonthlySales'),
+            platform: getValue(vals, 'platform'),
+            protection: getValue(vals, 'protection'),
+            returns: getValue(vals, 'returns'),
+            status: STATUS.NOT_VISITED,
+            notes: '',
+            contactName: '',
+            ordersPerMonth: 'N/A',
+            aov: 'N/A',
+            businessCardData: null,
+            recordId: getValue(vals, 'recordId'),
+            ownerId: getValue(vals, 'ownerId'),
+            lastContacted: getValue(vals, 'lastContacted'),
+            campaign: getValue(vals, 'campaign'),
+            competitorInstalls: getValue(vals, 'competitorInstalls'),
+            competitorUninstalls: getValue(vals, 'competitorUninstalls'),
+            techInstalls: getValue(vals, 'techInstalls'),
+            instagramFollowers: getNumeric(vals, 'instagramFollowers'),
+            facebookFollowers: getNumeric(vals, 'facebookFollowers'),
+            monthlyVisits: getNumeric(vals, 'monthlyVisits'),
+            hubspotUrl: getValue(vals, 'hubspotUrl'),
+            associatedDeal: getValue(vals, 'associatedDeal'),
+            associatedDealIds: getValue(vals, 'associatedDealIds'),
+            dealRecordId: getValue(vals, 'dealRecordId'),
+            dealName: getValue(vals, 'dealName'),
+            appInstalled: getValue(vals, 'appInstalled'),
+            productOffering: getValue(vals, 'productOffering')
+          };
+          
+          if (booth.companyName) {
+            await saveBooth(booth);
+            added++;
+          }
+        }
+      }
+      
+      console.log('Merge complete:', { updated, added, skipped });
+      hideMapperModal();
+      hideAdminModal();
+      alert(`Merge complete!\n\nUpdated: ${updated}\nAdded: ${added}\nSkipped: ${skipped}`);
+      
+      if (currentShowId === showId) {
+        await loadBoothList();
+        renderBoothList();
+      }
+      return;
+    }
+    
+    // REPLACE MODE: Original behavior
     const newBooths = [];
     
     for (const vals of lines) {
-      const getValue = (key) => columnMapping[key] !== undefined ? (vals[columnMapping[key]] || '') : '';
-      const getNumeric = (key) => {
-        const val = getValue(key);
-        return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
-      };
-      
       const booth = {
         id: `${showId}_${repId || 'shared'}_${listType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         showId,
         repId,
         listType,
-        companyName: getValue('companyName'),
-        boothNumber: getValue('boothNumber'),
-        domain: getValue('domain'),
-        estimatedMonthlySales: getNumeric('estimatedMonthlySales'),
-        platform: getValue('platform'),
-        protection: getValue('protection'),
-        returns: getValue('returns'),
+        companyName: getValue(vals, 'companyName'),
+        boothNumber: getValue(vals, 'boothNumber'),
+        domain: getValue(vals, 'domain'),
+        estimatedMonthlySales: getNumeric(vals, 'estimatedMonthlySales'),
+        platform: getValue(vals, 'platform'),
+        protection: getValue(vals, 'protection'),
+        returns: getValue(vals, 'returns'),
         status: STATUS.NOT_VISITED,
         notes: '',
         contactName: '',
@@ -2255,23 +2398,23 @@ async function confirmMapping() {
         aov: 'N/A',
         businessCardData: null,
         // Extended fields
-        recordId: getValue('recordId'),
-        ownerId: getValue('ownerId'),
-        lastContacted: getValue('lastContacted'),
-        campaign: getValue('campaign'),
-        competitorInstalls: getValue('competitorInstalls'),
-        competitorUninstalls: getValue('competitorUninstalls'),
-        techInstalls: getValue('techInstalls'),
-        instagramFollowers: getNumeric('instagramFollowers'),
-        facebookFollowers: getNumeric('facebookFollowers'),
-        monthlyVisits: getNumeric('monthlyVisits'),
-        hubspotUrl: getValue('hubspotUrl'),
-        associatedDeal: getValue('associatedDeal'),
-        associatedDealIds: getValue('associatedDealIds'),
-        dealRecordId: getValue('dealRecordId'),
-        dealName: getValue('dealName'),
-        appInstalled: getValue('appInstalled'),
-        productOffering: getValue('productOffering')
+        recordId: getValue(vals, 'recordId'),
+        ownerId: getValue(vals, 'ownerId'),
+        lastContacted: getValue(vals, 'lastContacted'),
+        campaign: getValue(vals, 'campaign'),
+        competitorInstalls: getValue(vals, 'competitorInstalls'),
+        competitorUninstalls: getValue(vals, 'competitorUninstalls'),
+        techInstalls: getValue(vals, 'techInstalls'),
+        instagramFollowers: getNumeric(vals, 'instagramFollowers'),
+        facebookFollowers: getNumeric(vals, 'facebookFollowers'),
+        monthlyVisits: getNumeric(vals, 'monthlyVisits'),
+        hubspotUrl: getValue(vals, 'hubspotUrl'),
+        associatedDeal: getValue(vals, 'associatedDeal'),
+        associatedDealIds: getValue(vals, 'associatedDealIds'),
+        dealRecordId: getValue(vals, 'dealRecordId'),
+        dealName: getValue(vals, 'dealName'),
+        appInstalled: getValue(vals, 'appInstalled'),
+        productOffering: getValue(vals, 'productOffering')
       };
       
       if (booth.companyName) newBooths.push(booth);
