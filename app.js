@@ -2251,7 +2251,7 @@ async function confirmMapping() {
     // MERGE MODE: Update existing booths
     if (importMode === 'merge') {
       // Load existing booths for this list
-      const existingBooths = await getBoothsForList(showId, repId, listType);
+      const existingBooths = await getBooths(showId, repId, listType);
       console.log('Existing booths:', existingBooths.length);
       
       let updated = 0;
