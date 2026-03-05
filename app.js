@@ -58,12 +58,21 @@ function getBoothHall(boothNumber) {
   if (!boothNumber) return null;
   const num = boothNumber.toString().toUpperCase().trim();
   
+  // F prefix booths (Plaza/Food area)
+  if (num.startsWith('F')) {
+    return { hall: 'Plaza', level: 'Plaza', category: 'Food Court' };
+  }
+  
   // North Hall booths (N prefix)
   if (num.startsWith('N')) {
     const nNum = parseInt(num.substring(1));
-    if (nNum >= 146 && nNum <= 1203) return { hall: 'North Hall', level: 'Level 100', category: 'Hot Products' };
-    if (nNum >= 1352 && nNum <= 2303) return { hall: 'North Hall', level: 'Level 200', category: 'Hot Products' };
-    return { hall: 'North Hall', level: 'Unknown', category: 'Hot Products' };
+    if (!isNaN(nNum)) {
+      if (nNum >= 100 && nNum <= 199) return { hall: 'North Hall', level: 'Level 100', category: 'Hot Products' };
+      if (nNum >= 1000 && nNum <= 1299) return { hall: 'North Hall', level: 'Level 100', category: 'Hot Products' };
+      if (nNum >= 1300 && nNum <= 1499) return { hall: 'North Hall', level: 'Level 200', category: 'Hot Products' };
+      if (nNum >= 1500 && nNum <= 2303) return { hall: 'North Hall', level: 'Level 200', category: 'Hot Products' };
+    }
+    return { hall: 'North Hall', level: '', category: 'Hot Products' };
   }
   
   const numericBooth = parseInt(num);
@@ -575,9 +584,35 @@ function getFilteredBooths() {
     });
   }
 
+  // Helper to parse booth number for sorting (handles N100, F7, 3786, etc.)
+  const parseBoothForSort = (boothNum) => {
+    if (!boothNum) return { prefix: 'ZZZ', num: 99999 };
+    const str = boothNum.toString().toUpperCase().trim();
+    const match = str.match(/^([A-Z]*)(\d+)([A-Z]*)$/);
+    if (match) {
+      return { 
+        prefix: match[1] || '', 
+        num: parseInt(match[2]) || 0,
+        suffix: match[3] || ''
+      };
+    }
+    return { prefix: str, num: 0, suffix: '' };
+  };
+
   // First sort by selected criteria
   switch (sortBy) {
-    case 'booth': result.sort((a, b) => (parseInt(a.boothNumber) || 99999) - (parseInt(b.boothNumber) || 99999)); break;
+    case 'booth': 
+      result.sort((a, b) => {
+        const pa = parseBoothForSort(a.boothNumber);
+        const pb = parseBoothForSort(b.boothNumber);
+        // First sort by prefix (F, N, or empty)
+        if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+        // Then by number
+        if (pa.num !== pb.num) return pa.num - pb.num;
+        // Then by suffix
+        return (pa.suffix || '').localeCompare(pb.suffix || '');
+      });
+      break;
     case 'value': result.sort((a, b) => (b.estimatedMonthlySales || 0) - (a.estimatedMonthlySales || 0)); break;
     case 'name': result.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || '')); break;
   }
@@ -674,7 +709,7 @@ function renderBoothList(preserveScroll = false) {
     const igFollowers = formatFollowers(b.instagramFollowers || b.instagram_followers);
     const fbFollowers = formatFollowers(b.facebookFollowers || b.facebook_followers);
     const socialDisplay = (igFollowers || fbFollowers) ? 
-      `<span class="social-stats">${igFollowers ? `<i class="fab fa-instagram"></i>${igFollowers}` : ''}${igFollowers && fbFollowers ? ' ' : ''}${fbFollowers ? `<i class="fab fa-facebook"></i>${fbFollowers}` : ''}</span>` : '';
+      `<span class="social-stats">${igFollowers ? `<i class="fab fa-instagram"></i>${igFollowers}` : ''}${fbFollowers ? ` <i class="fab fa-facebook"></i>${fbFollowers}` : ''}</span>` : '';
     
     return `
     <div class="booth-item ${config.hasDetail ? '' : 'no-click'}" data-booth-id="${b.id}">
@@ -689,8 +724,8 @@ function renderBoothList(preserveScroll = false) {
           ${tag}${claimedTag}
         </div>
         <div class="booth-meta">
-          ${b.platform || ''}
-          ${b.protection ? `<span class="competitor"> • ${b.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
+          <span>${b.platform || 'No platform'}</span>
+          ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
           ${socialDisplay}
           ${ownerDisplay}
         </div>
@@ -885,7 +920,6 @@ async function showDetailView(id) {
       <div class="detail-links">
         ${booth.domain ? `<a href="https://${booth.domain}" target="_blank" class="detail-link"><i class="fas fa-globe"></i> Website</a>` : ''}
         ${booth.hubspotUrl || booth.hubspot_url ? `<a href="${booth.hubspotUrl || booth.hubspot_url}" target="_blank" class="detail-link hubspot"><i class="fab fa-hubspot"></i> HubSpot</a>` : ''}
-        ${booth.domain ? `<a href="https://storeleads.app/json/${booth.domain}" target="_blank" class="detail-link storeleads"><i class="fas fa-store"></i> StoreLeads</a>` : ''}
       </div>
     </div>
 
@@ -1044,7 +1078,7 @@ function copyForFollowUp() {
   if (!booth) return;
   const text = [booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n');
   navigator.clipboard.writeText(text);
-  if (booth.status === STATUS.NOT_VISITED) setStatus(STATUS.FOLLOW_UP);
+  if (booth.status === STATUS.NOT_VISITED || booth.status === STATUS.COME_BACK) setStatus(STATUS.FOLLOW_UP_WARM);
   alert('Copied for Follow Up workflow');
 }
 
@@ -1119,6 +1153,13 @@ function showSubmitModal(type) {
             <label>Follow Up Task Date</label>
             <input type="date" class="input" id="submit-task-date" value="${getDefaultTaskDate()}">
           </div>
+          <div class="form-group">
+            <label>Follow Up Type</label>
+            <div class="followup-type-btns">
+              <button type="button" class="followup-type-btn active" data-type="warm"><i class="fas fa-fire"></i> Warm</button>
+              <button type="button" class="followup-type-btn" data-type="cold"><i class="fas fa-snowflake"></i> Cold</button>
+            </div>
+          </div>
           `}
           
           <!-- Lead data below -->
@@ -1158,6 +1199,16 @@ function showSubmitModal(type) {
   
   modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  
+  // Follow up type toggle (warm/cold)
+  let followUpType = 'warm';
+  modal.querySelectorAll('.followup-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('.followup-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      followUpType = btn.dataset.type;
+    });
+  });
   
   modal.querySelector('#submit-webhook-btn').addEventListener('click', async () => {
     const repId = modal.querySelector('#submit-rep').value;
@@ -1237,8 +1288,10 @@ function showSubmitModal(type) {
       // Update booth status
       if (isDemo) {
         await setStatus(STATUS.DEMO_BOOKED);
-      } else if (booth.status === STATUS.NOT_VISITED) {
-        await setStatus(STATUS.FOLLOW_UP);
+      } else {
+        // Set warm or cold follow up based on user selection
+        const newStatus = followUpType === 'cold' ? STATUS.FOLLOW_UP_COLD : STATUS.FOLLOW_UP_WARM;
+        await setStatus(newStatus);
       }
       
       // Update booth with latest values
@@ -1915,6 +1968,9 @@ function showMapperModal() {
         recordId: ['record id', 'record_id', 'id', 'hubspot id'],
         competitorInstalls: ['competitor tracking - installs', 'competitor installs', 'protection installs'],
         competitorUninstalls: ['competitor tracking - uninstalls', 'competitor uninstalls', 'protection uninstalls'],
+        instagramFollowers: ['instagram followers', 'ig followers', 'instagram'],
+        facebookFollowers: ['facebook followers', 'fb followers', 'facebook'],
+        hubspotUrl: ['hubspot company url', 'hubspot url', 'company url', 'hubspot link', 'hs url'],
       };
       
       const patterns = variations[field.key] || [];
@@ -2053,6 +2109,7 @@ async function confirmMapping() {
         instagramFollowers: getNumeric('instagramFollowers'),
         facebookFollowers: getNumeric('facebookFollowers'),
         monthlyVisits: getNumeric('monthlyVisits'),
+        hubspotUrl: getValue('hubspotUrl'),
         associatedDeal: getValue('associatedDeal'),
         associatedDealIds: getValue('associatedDealIds'),
         dealRecordId: getValue('dealRecordId'),
