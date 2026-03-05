@@ -2,6 +2,9 @@
 const SUPABASE_URL = 'https://qnscnhccaedrwwmjxhuc.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_uKmMzyUx5EkAs8GmETBTgw_e2WsKTNn';
 
+// Claude API for OCR (set this to enable business card scanning)
+const CLAUDE_API_KEY = ''; // Add your Anthropic API key here to enable OCR
+
 // Status Options
 const STATUS = {
   NOT_VISITED: 'not_visited',
@@ -198,7 +201,8 @@ const CSV_FIELDS = {
     { key: 'techInstalls', label: 'Tech Tracking - Installs', required: false },
     { key: 'instagramFollowers', label: 'Instagram Followers', required: false },
     { key: 'facebookFollowers', label: 'Facebook Followers', required: false },
-    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false }
+    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false },
+    { key: 'hubspotUrl', label: 'HubSpot Company URL', required: false }
   ],
   [LIST_TYPES.CUSTOMERS]: [
     { key: 'recordId', label: 'Record ID - Company', required: false },
@@ -267,7 +271,8 @@ const CSV_FIELDS = {
     { key: 'techInstalls', label: 'Tech Tracking - Installs', required: false },
     { key: 'instagramFollowers', label: 'Instagram Followers', required: false },
     { key: 'facebookFollowers', label: 'Facebook Followers', required: false },
-    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false }
+    { key: 'monthlyVisits', label: 'Estimated Monthly Visits', required: false },
+    { key: 'hubspotUrl', label: 'HubSpot Company URL', required: false }
   ]
 };
 
