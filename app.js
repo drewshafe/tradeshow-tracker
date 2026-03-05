@@ -8,11 +8,24 @@ let currentBoothId = null;
 let booths = [];
 let sortBy = 'booth';
 let searchQuery = '';
-let filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all' };
+let filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' };
 let tempFilters = { ...filters, platforms: [] };
 let pendingImportData = null;
 let columnMapping = {};
 let cameraStream = null;
+let listScrollPosition = 0; // Track scroll position
+
+// Hall options for filtering
+const HALL_OPTIONS = [
+  { value: 'all', label: 'All Halls' },
+  { value: 'Hall A', label: 'Hall A' },
+  { value: 'Hall B', label: 'Hall B' },
+  { value: 'Hall C', label: 'Hall C' },
+  { value: 'Hall D', label: 'Hall D' },
+  { value: 'Hall E', label: 'Hall E (Lower)' },
+  { value: 'North Hall', label: 'North Hall' },
+  { value: 'Level 3', label: 'Level 3' }
+];
 
 // Helper to get app badge (EcoCart or ShipInsure)
 function getAppBadge(appInstalled, productOffering) {
@@ -23,6 +36,72 @@ function getAppBadge(appInstalled, productOffering) {
     return '<span class="app-badge shipinsure">ShipInsure</span>';
   }
   return '';
+}
+
+// Helper to get status icon
+function getStatusIcon(status) {
+  switch(status) {
+    case STATUS.NOT_VISITED: return 'circle';
+    case STATUS.COME_BACK: return 'redo-alt';
+    case STATUS.FOLLOW_UP_WARM: return 'fire';
+    case STATUS.FOLLOW_UP_COLD: return 'snowflake';
+    case STATUS.DEMO_BOOKED: return 'calendar-check';
+    case STATUS.NOT_INTERESTED: return 'thumbs-down';
+    case STATUS.DQ: return 'ban';
+    case STATUS.NOT_AT_SHOW: return 'store-slash';
+    default: return 'circle';
+  }
+}
+
+// Helper to determine hall/level from booth number
+function getBoothHall(boothNumber) {
+  if (!boothNumber) return null;
+  const num = boothNumber.toString().toUpperCase().trim();
+  
+  // North Hall booths (N prefix)
+  if (num.startsWith('N')) {
+    const nNum = parseInt(num.substring(1));
+    if (nNum >= 146 && nNum <= 1203) return { hall: 'North Hall', level: 'Level 100', category: 'Hot Products' };
+    if (nNum >= 1352 && nNum <= 2303) return { hall: 'North Hall', level: 'Level 200', category: 'Hot Products' };
+    return { hall: 'North Hall', level: 'Unknown', category: 'Hot Products' };
+  }
+  
+  const numericBooth = parseInt(num);
+  if (isNaN(numericBooth)) return null;
+  
+  // Level 3
+  if (numericBooth >= 8900 && numericBooth <= 8923) return { hall: 'Level 3', level: 'Level 3', category: 'Startup CPG' };
+  if (numericBooth >= 8110 && numericBooth <= 8221) return { hall: 'Level 3', level: 'Level 3', category: 'Snack Lab' };
+  if (numericBooth >= 7800 && numericBooth <= 8822) return { hall: 'Level 3', level: 'Level 3', category: 'Hot Products' };
+  
+  // Lower Level (Hall E)
+  if (numericBooth >= 4900 && numericBooth <= 5799) return { hall: 'Hall E', level: 'Lower Level', category: 'Natural & Specialty Foods' };
+  
+  // Level 1 - Hall D (Supplements + Natural & Specialty Foods)
+  if (numericBooth >= 3387 && numericBooth <= 4899) return { hall: 'Hall D', level: 'Level 1', category: 'Supplements / Natural & Specialty Foods' };
+  
+  // Level 1 - Hall C (multiple categories)
+  if (numericBooth >= 2772 && numericBooth <= 2897) return { hall: 'Hall C', level: 'Level 1', category: 'Wellness Beverage' };
+  if (numericBooth >= 2577 && numericBooth <= 2683) return { hall: 'Hall C', level: 'Level 1', category: 'Conscious Beauty' };
+  if (numericBooth >= 2301 && numericBooth <= 3199) return { hall: 'Hall C', level: 'Level 1', category: 'Lifestyle' };
+  if (numericBooth >= 2486 && numericBooth <= 3199) return { hall: 'Hall C', level: 'Level 1', category: 'Natural & Specialty Foods' };
+  
+  // Level 1 - Hall B (Organic + Natural & Specialty Foods)
+  if (numericBooth >= 1302 && numericBooth <= 2336) return { hall: 'Hall B', level: 'Level 1', category: 'Organic' };
+  if (numericBooth >= 1476 && numericBooth <= 2198) return { hall: 'Hall B', level: 'Level 1', category: 'Natural & Specialty Foods' };
+  
+  // Level 1 - Hall A
+  if (numericBooth >= 300 && numericBooth <= 1334) return { hall: 'Hall A', level: 'Level 1', category: 'Natural & Specialty Foods' };
+  
+  return null;
+}
+
+// Format follower count
+function formatFollowers(count) {
+  if (!count || count === 0) return null;
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+  return count.toString();
 }
 
 // Helper to get Aligned QR code section
@@ -38,6 +117,52 @@ function getAlignedSection() {
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(alignedUrl)}" alt="Scan to enter Aligned room" class="aligned-qr">
         <p class="aligned-hint">Have prospect scan to enter room</p>
         <a href="${alignedUrl}" target="_blank" class="aligned-link"><i class="fas fa-external-link-alt"></i> Open Room</a>
+      </div>
+    </div>
+  `;
+}
+
+function getCalendarSection() {
+  const rep = reps.find(r => r.id === currentRepId);
+  const calendarUrl = rep?.calendarUrl || rep?.calendar_url;
+  if (!calendarUrl) return '';
+  
+  return `
+    <div class="section">
+      <div class="section-title">Book a Demo - ${rep.name}</div>
+      <div class="calendar-embed-container">
+        <iframe src="${calendarUrl}" class="calendar-iframe" frameborder="0"></iframe>
+      </div>
+    </div>
+  `;
+}
+
+function getFilesSection(booth) {
+  const attachments = booth.attachments || [];
+  
+  return `
+    <div class="section">
+      <div class="section-title">Files & Attachments</div>
+      <div class="files-container">
+        ${attachments.length > 0 ? `
+          <div class="files-grid">
+            ${attachments.map((file, idx) => `
+              <div class="file-item" data-idx="${idx}">
+                ${file.type === 'image' 
+                  ? `<img src="${file.url}" class="file-thumbnail" alt="${file.name}">`
+                  : `<div class="file-icon"><i class="fas fa-file-pdf"></i></div>`}
+                <div class="file-name">${file.name || 'File'}</div>
+                <button class="file-delete-btn" data-idx="${idx}"><i class="fas fa-trash"></i></button>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<p class="empty-files">No files uploaded yet</p>'}
+        <div class="file-upload-area">
+          <input type="file" id="file-upload-input" accept="image/*,.pdf" multiple style="display:none">
+          <button class="upload-files-btn" id="upload-files-btn">
+            <i class="fas fa-plus"></i> Add Files (Images or PDFs)
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -184,6 +309,11 @@ async function showDashboard() {
 function showListView() {
   hideAllViews();
   document.getElementById('list-view').classList.add('active');
+  // Restore scroll position
+  requestAnimationFrame(() => {
+    const list = document.getElementById('booth-list');
+    if (list && listScrollPosition) list.scrollTop = listScrollPosition;
+  });
 }
 
 function hideAllViews() {
@@ -438,23 +568,41 @@ function getFilteredBooths() {
 
   if (filters.minRevenue > 0) result = result.filter(b => (b.estimatedMonthlySales || 0) >= filters.minRevenue);
   if (filters.status !== 'all') result = result.filter(b => b.status === filters.status);
+  if (filters.hall !== 'all') {
+    result = result.filter(b => {
+      const hallInfo = getBoothHall(b.boothNumber);
+      return hallInfo && hallInfo.hall === filters.hall;
+    });
+  }
 
+  // First sort by selected criteria
   switch (sortBy) {
     case 'booth': result.sort((a, b) => (parseInt(a.boothNumber) || 99999) - (parseInt(b.boothNumber) || 99999)); break;
     case 'value': result.sort((a, b) => (b.estimatedMonthlySales || 0) - (a.estimatedMonthlySales || 0)); break;
     case 'name': result.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || '')); break;
   }
+  
+  // Then sort by status priority (Come Back first) while maintaining secondary sort
+  result.sort((a, b) => {
+    const priorityA = STATUS_PRIORITY[a.status] || 99;
+    const priorityB = STATUS_PRIORITY[b.status] || 99;
+    return priorityA - priorityB;
+  });
+  
   return result;
 }
 
-function renderBoothList() {
+function renderBoothList(preserveScroll = false) {
   const filtered = getFilteredBooths();
   const list = document.getElementById('booth-list');
   const config = LIST_CONFIG[currentListType] || {};
   
+  // Save scroll position before re-render
+  const scrollPos = preserveScroll ? list.scrollTop : 0;
+  
   document.getElementById('stat-showing').textContent = filtered.length;
-  document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED || !b.status).length;
-  document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP).length;
+  document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED || b.status === STATUS.COME_BACK || !b.status).length;
+  document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_COLD).length;
   document.getElementById('stat-demos').textContent = booths.filter(b => b.status === STATUS.DEMO_BOOKED).length;
 
   renderActiveFilters();
@@ -464,6 +612,11 @@ function renderBoothList() {
     document.getElementById('import-empty-btn')?.addEventListener('click', showAdminModal);
     document.getElementById('clear-filters-empty-btn')?.addEventListener('click', clearFilters);
     return;
+  }
+  
+  // Restore scroll position after render
+  if (preserveScroll) {
+    requestAnimationFrame(() => { list.scrollTop = scrollPos; });
   }
 
   // Grid view for Master, Customer, Working, Opps, People
@@ -517,12 +670,18 @@ function renderBoothList() {
     const tag = b.tag ? `<span class="item-tag ${b.tag.toLowerCase()}">${b.tag}</span>` : '';
     const claimedTag = b.claimedBy ? `<span class="item-tag claimed">Claimed: ${reps.find(r => r.id === b.claimedBy)?.name || b.claimedBy}</span>` : '';
     const ownerDisplay = config.showRep && b.ownerId ? `<span class="owner-badge">${getOwnerName(b.ownerId)}</span>` : '';
+    const hallInfo = getBoothHall(b.boothNumber);
+    const igFollowers = formatFollowers(b.instagramFollowers || b.instagram_followers);
+    const fbFollowers = formatFollowers(b.facebookFollowers || b.facebook_followers);
+    const socialDisplay = (igFollowers || fbFollowers) ? 
+      `<span class="social-stats">${igFollowers ? `<i class="fab fa-instagram"></i>${igFollowers}` : ''}${igFollowers && fbFollowers ? ' ' : ''}${fbFollowers ? `<i class="fab fa-facebook"></i>${fbFollowers}` : ''}</span>` : '';
     
     return `
     <div class="booth-item ${config.hasDetail ? '' : 'no-click'}" data-booth-id="${b.id}">
       <div class="booth-left">
         <div class="status-dot ${b.status || 'not_visited'}"></div>
         <span class="booth-number">${b.boothNumber || '-'}</span>
+        ${hallInfo ? `<span class="hall-badge">${hallInfo.hall}</span>` : ''}
       </div>
       <div class="booth-center">
         <div class="company-row">
@@ -532,6 +691,7 @@ function renderBoothList() {
         <div class="booth-meta">
           ${b.platform || ''}
           ${b.protection ? `<span class="competitor"> • ${b.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
+          ${socialDisplay}
           ${ownerDisplay}
         </div>
       </div>
@@ -588,6 +748,7 @@ function renderActiveFilters() {
   if (filters.returns !== 'all') { count++; chips.push({ key: 'returns', label: filters.returns }); }
   if (filters.minRevenue > 0) { count++; chips.push({ key: 'minRevenue', label: `≥ ${formatCurrency(filters.minRevenue)}` }); }
   if (filters.status !== 'all') { count++; chips.push({ key: 'status', label: STATUS_LABELS[filters.status] }); }
+  if (filters.hall !== 'all') { count++; chips.push({ key: 'hall', label: filters.hall }); }
 
   if (count > 0) {
     container.innerHTML = chips.map(c => `<button class="filter-chip" data-filter="${c.key}">${c.label} <i class="fas fa-times"></i></button>`).join('') +
@@ -682,12 +843,21 @@ function clearSearch() {
 // ============ DETAIL VIEW ============
 
 async function showDetailView(id) {
+  // Save list scroll position before navigating
+  const list = document.getElementById('booth-list');
+  if (list) listScrollPosition = list.scrollTop;
+  
   currentBoothId = id;
   const booth = booths.find(b => b.id === id);
   if (!booth) return;
 
   // Get people for this company domain
   const companyPeople = booth.domain ? await getPeopleByDomain(currentShowId, booth.domain) : [];
+  
+  // Get hall info and social data
+  const hallInfo = getBoothHall(booth.boothNumber);
+  const igFollowers = formatFollowers(booth.instagramFollowers || booth.instagram_followers);
+  const fbFollowers = formatFollowers(booth.facebookFollowers || booth.facebook_followers);
 
   document.getElementById('detail-company').textContent = booth.companyName || 'Unknown';
   
@@ -696,6 +866,7 @@ async function showDetailView(id) {
     <div class="detail-header">
       <div class="detail-header-row">
         <span class="booth-badge">Booth ${booth.boothNumber || '-'}</span>
+        ${hallInfo ? `<span class="hall-badge-detail">${hallInfo.hall} • ${hallInfo.category}</span>` : ''}
         <span class="detail-sales">${formatCurrency(booth.estimatedMonthlySales)}/mo</span>
       </div>
       <div class="detail-domain">${booth.domain || ''}</div>
@@ -704,7 +875,18 @@ async function showDetailView(id) {
         ${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
         ${booth.returns ? ` • Returns: ${booth.returns}` : ''}
       </div>
+      ${(igFollowers || fbFollowers) ? `
+      <div class="detail-social">
+        ${igFollowers ? `<span class="social-item"><i class="fab fa-instagram"></i> ${igFollowers}</span>` : ''}
+        ${fbFollowers ? `<span class="social-item"><i class="fab fa-facebook"></i> ${fbFollowers}</span>` : ''}
+      </div>
+      ` : ''}
       ${booth.tag ? `<span class="detail-tag ${booth.tag.toLowerCase()}">${booth.tag}</span>` : ''}
+      <div class="detail-links">
+        ${booth.domain ? `<a href="https://${booth.domain}" target="_blank" class="detail-link"><i class="fas fa-globe"></i> Website</a>` : ''}
+        ${booth.hubspotUrl || booth.hubspot_url ? `<a href="${booth.hubspotUrl || booth.hubspot_url}" target="_blank" class="detail-link hubspot"><i class="fab fa-hubspot"></i> HubSpot</a>` : ''}
+        ${booth.domain ? `<a href="https://storeleads.app/json/${booth.domain}" target="_blank" class="detail-link storeleads"><i class="fas fa-store"></i> StoreLeads</a>` : ''}
+      </div>
     </div>
 
     ${companyPeople.length > 0 ? `
@@ -726,7 +908,7 @@ async function showDetailView(id) {
       <div class="status-buttons">
         ${Object.entries(STATUS).map(([key, val]) => `
           <button class="status-btn ${val} ${booth.status === val ? 'active' : ''}" data-status="${val}">
-            <i class="fas fa-${val === 'not_visited' ? 'circle' : val === 'follow_up' ? 'clock' : val === 'demo_booked' ? 'calendar' : 'times-circle'}"></i>
+            <i class="fas fa-${getStatusIcon(val)}"></i>
             ${STATUS_LABELS[val]}
           </button>
         `).join('')}
@@ -772,6 +954,10 @@ async function showDetailView(id) {
     </div>
 
     ${getAlignedSection()}
+    
+    ${getCalendarSection()}
+    
+    ${getFilesSection(booth)}
   `;
 
   // Attach event listeners
@@ -798,6 +984,25 @@ async function showDetailView(id) {
   document.getElementById('submit-followup-btn').addEventListener('click', () => showSubmitModal('followup'));
   document.getElementById('submit-demo-btn').addEventListener('click', () => showSubmitModal('demo'));
   document.getElementById('open-slack-btn').addEventListener('click', openSlack);
+  
+  // File upload listeners
+  document.getElementById('upload-files-btn')?.addEventListener('click', () => {
+    document.getElementById('file-upload-input').click();
+  });
+  document.getElementById('file-upload-input')?.addEventListener('change', handleFileUpload);
+  content.querySelectorAll('.file-delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteAttachment(parseInt(btn.dataset.idx));
+    });
+  });
+  content.querySelectorAll('.file-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const booth = booths.find(b => b.id === currentBoothId);
+      const attachment = booth?.attachments?.[parseInt(item.dataset.idx)];
+      if (attachment?.url) window.open(attachment.url, '_blank');
+    });
+  });
 
   hideAllViews();
   document.getElementById('detail-view').classList.add('active');
@@ -1217,6 +1422,59 @@ async function capturePhoto() {
 
 async function removeCard() {
   await updateBoothField('businessCardData', null);
+  await updateBoothField('businessCardUrl', null);
+  showDetailView(currentBoothId);
+}
+
+// File Upload Functions
+async function handleFileUpload(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+  
+  const booth = booths.find(b => b.id === currentBoothId);
+  if (!booth) return;
+  
+  const attachments = booth.attachments || [];
+  
+  for (const file of files) {
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    
+    if (!isImage && !isPdf) {
+      alert(`Skipping ${file.name}: Only images and PDFs allowed`);
+      continue;
+    }
+    
+    try {
+      // Upload to Supabase Storage
+      const url = await uploadAttachment(file, currentBoothId);
+      if (url) {
+        attachments.push({
+          name: file.name,
+          type: isImage ? 'image' : 'pdf',
+          url: url,
+          uploadedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      alert(`Error uploading ${file.name}`);
+    }
+  }
+  
+  booth.attachments = attachments;
+  await saveBooth(booth);
+  showDetailView(currentBoothId);
+}
+
+async function deleteAttachment(idx) {
+  if (!confirm('Delete this file?')) return;
+  
+  const booth = booths.find(b => b.id === currentBoothId);
+  if (!booth || !booth.attachments) return;
+  
+  booth.attachments.splice(idx, 1);
+  await saveBooth(booth);
   showDetailView(currentBoothId);
 }
 
@@ -1271,6 +1529,12 @@ function renderFilterOptions() {
         ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${tempFilters.status === v ? 'active' : ''}" data-filter="status" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
       </div>
     </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Hall / Level</div>
+      <div class="filter-options">
+        ${HALL_OPTIONS.map(h => `<button class="filter-option ${tempFilters.hall === h.value ? 'active' : ''}" data-filter="hall" data-value="${h.value}">${h.label}</button>`).join('')}
+      </div>
+    </div>
   `;
   
   container.querySelectorAll('.filter-option').forEach(btn => {
@@ -1300,7 +1564,7 @@ function renderFilterOptions() {
 }
 
 function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])] }; hideFilterModal(); renderBoothList(); }
-function clearFilters() { filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all' }; tempFilters = { ...filters, platforms: [] }; hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' }; tempFilters = { ...filters, platforms: [] }; hideFilterModal(); renderBoothList(); }
 
 // ============ LIST ACTIONS ============
 
