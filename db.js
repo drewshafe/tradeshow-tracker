@@ -310,7 +310,8 @@
       sourceBoothId: row.source_booth_id,
       tag: row.tag,
       appInstalled: row.app_installed,
-      productOffering: row.product_offering
+      productOffering: row.product_offering,
+      hubspotUrl: row.hubspot_url
     };
   }
 
@@ -355,7 +356,8 @@
       source_booth_id: booth.sourceBoothId,
       tag: booth.tag,
       app_installed: booth.appInstalled,
-      product_offering: booth.productOffering
+      product_offering: booth.productOffering,
+      hubspot_url: booth.hubspotUrl
     };
   }
 
