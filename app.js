@@ -215,6 +215,25 @@ function updateHallOptionsForShow(show) {
   }
 }
 
+// Get hall options for the current show (used in filter modal)
+function getHallOptionsForCurrentShow() {
+  const show = shows.find(s => s.id === currentShowId);
+  const hallConfig = show?.hallConfig || show?.hall_config;
+  
+  // If show has custom hall config, use those halls
+  if (hallConfig && hallConfig.rules && hallConfig.rules.length > 0) {
+    const uniqueHalls = [...new Set(hallConfig.rules.map(r => r.hall).filter(Boolean))];
+    const options = [{ value: 'all', label: 'All Halls' }];
+    uniqueHalls.forEach(hall => {
+      options.push({ value: hall, label: hall });
+    });
+    return options;
+  }
+  
+  // Otherwise return the default HALL_OPTIONS (Expo West fallback)
+  return HALL_OPTIONS;
+}
+
 // Format follower count
 function formatFollowers(count) {
   if (!count || count === 0) return null;
@@ -1813,7 +1832,7 @@ function renderFilterOptions() {
     <div class="filter-section">
       <div class="filter-section-title">Hall / Level</div>
       <div class="filter-options">
-        ${HALL_OPTIONS.map(h => `<button class="filter-option ${tempFilters.hall === h.value ? 'active' : ''}" data-filter="hall" data-value="${h.value}">${h.label}</button>`).join('')}
+        ${getHallOptionsForCurrentShow().map(h => `<button class="filter-option ${tempFilters.hall === h.value ? 'active' : ''}" data-filter="hall" data-value="${h.value}">${h.label}</button>`).join('')}
       </div>
     </div>
   `;
