@@ -610,3 +610,36 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
   border-color: var(--blue);
   color: var(--blue);
 }
+
+/* Hall Config Admin */
+.hall-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.hall-rule-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.hall-rule-row .input {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-icon:hover {
+  opacity: 0.8;
+}
