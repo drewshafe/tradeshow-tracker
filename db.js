@@ -47,7 +47,8 @@
         start_date: show.startDate, end_date: show.endDate,
         website: show.website, exhibitor_list: show.exhibitorList,
         reps: show.reps || null,
-        aligned_room_url: show.alignedRoomUrl || null
+        aligned_room_url: show.alignedRoomUrl || null,
+        hall_config: show.hallConfig || show.hall_config || null
       });
     } else {
       const shows = await window.getShows();
