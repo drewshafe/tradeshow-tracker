@@ -8,9 +8,9 @@ let currentBoothId = null;
 let booths = [];
 let sortBy = 'booth';
 let searchQuery = '';
-const DEFAULT_FILTERS = { platforms: [], protection: 'all', returns: 'all', minRevenue: 0, status: 'all', hall: 'all' };
+const DEFAULT_FILTERS = { platforms: [], statuses: [], protection: 'all', returns: 'all', minRevenue: 0, hall: 'all' };
 let filters = { ...DEFAULT_FILTERS };
-let tempFilters = { ...filters, platforms: [] };
+let tempFilters = { ...filters, platforms: [], statuses: [] };
 let pendingImportData = null;
 let columnMapping = {};
 let cameraStream = null;
@@ -49,17 +49,17 @@ function loadFilters() {
     if (saved) {
       const parsed = JSON.parse(saved);
       filters = { ...DEFAULT_FILTERS, ...parsed };
-      tempFilters = { ...filters, platforms: [...(filters.platforms || [])] };
+      tempFilters = { ...filters, platforms: [...(filters.platforms || [])], statuses: [...(filters.statuses || [])] };
     } else {
       filters = { ...DEFAULT_FILTERS };
-      tempFilters = { ...filters, platforms: [] };
+      tempFilters = { ...filters, platforms: [], statuses: [] };
     }
     const savedSort = localStorage.getItem(`tst_sortBy_${currentShowId}_${currentRepId}`);
     if (savedSort) sortBy = savedSort;
   } catch (e) { 
     console.warn('Could not load filters:', e);
     filters = { ...DEFAULT_FILTERS };
-    tempFilters = { ...filters, platforms: [] };
+    tempFilters = { ...filters, platforms: [], statuses: [] };
   }
 }
 
@@ -708,7 +708,7 @@ function getFilteredBooths() {
   }
 
   if (filters.minRevenue > 0) result = result.filter(b => (b.estimatedMonthlySales || 0) >= filters.minRevenue);
-  if (filters.status !== 'all') result = result.filter(b => b.status === filters.status);
+  if (filters.statuses && filters.statuses.length > 0) result = result.filter(b => filters.statuses.includes(b.status));
   if (filters.hall !== 'all') {
     result = result.filter(b => {
       const hallInfo = getBoothHall(b.boothNumber);
@@ -917,7 +917,7 @@ function renderActiveFilters() {
   if (filters.protection !== 'all') { count++; chips.push({ key: 'protection', label: filters.protection }); }
   if (filters.returns !== 'all') { count++; chips.push({ key: 'returns', label: filters.returns }); }
   if (filters.minRevenue > 0) { count++; chips.push({ key: 'minRevenue', label: `≥ ${formatCurrency(filters.minRevenue)}` }); }
-  if (filters.status !== 'all') { count++; chips.push({ key: 'status', label: STATUS_LABELS[filters.status] }); }
+  if (filters.statuses && filters.statuses.length > 0) { count++; chips.push({ key: 'statuses', label: filters.statuses.length === 1 ? STATUS_LABELS[filters.statuses[0]] : `${filters.statuses.length} statuses` }); }
   if (filters.hall !== 'all') { count++; chips.push({ key: 'hall', label: filters.hall }); }
 
   if (count > 0) {
@@ -1823,10 +1823,10 @@ function renderFilterOptions() {
       </div>
     </div>
     <div class="filter-section">
-      <div class="filter-section-title">Status</div>
+      <div class="filter-section-title">Status (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${tempFilters.status === 'all' ? 'active' : ''}" data-filter="status" data-value="all">All</button>
-        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${tempFilters.status === v ? 'active' : ''}" data-filter="status" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
+        <button class="filter-option ${(tempFilters.statuses || []).length === 0 ? 'active' : ''}" data-filter="statuses" data-value="all">All</button>
+        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${(tempFilters.statuses || []).includes(v) ? 'active' : ''}" data-filter="statuses" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -1853,6 +1853,17 @@ function renderFilterOptions() {
             tempFilters.platforms = [...current, value];
           }
         }
+      } else if (key === 'statuses') {
+        if (value === 'all') {
+          tempFilters.statuses = [];
+        } else {
+          const current = tempFilters.statuses || [];
+          if (current.includes(value)) {
+            tempFilters.statuses = current.filter(s => s !== value);
+          } else {
+            tempFilters.statuses = [...current, value];
+          }
+        }
       } else if (key === 'minRevenue') {
         tempFilters[key] = parseInt(value);
       } else {
@@ -1863,8 +1874,8 @@ function renderFilterOptions() {
   });
 }
 
-function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])] }; saveFilters(); hideFilterModal(); renderBoothList(); }
-function clearFilters() { filters = { ...DEFAULT_FILTERS }; tempFilters = { ...filters, platforms: [] }; saveFilters(); hideFilterModal(); renderBoothList(); }
+function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])], statuses: [...(tempFilters.statuses || [])] }; saveFilters(); hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { ...DEFAULT_FILTERS }; tempFilters = { ...filters, platforms: [], statuses: [] }; saveFilters(); hideFilterModal(); renderBoothList(); }
 
 // ============ LIST ACTIONS ============
 
