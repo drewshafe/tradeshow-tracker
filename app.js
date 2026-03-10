@@ -1242,10 +1242,10 @@ const WEBHOOK_URLS = {
   followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/'
 };
 
-// Anthropic API Key for OCR
-const ANTHROPIC_API_KEY = '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';
+// OCR Edge Function URL
+const OCR_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ocr-scan`;
 
-// OCR Business Card using Claude Vision
+// OCR Business Card using Supabase Edge Function
 async function scanBusinessCard() {
   const booth = booths.find(b => b.id === currentBoothId);
   if (!booth || !booth.businessCardData) {
@@ -1261,37 +1261,14 @@ async function scanBusinessCard() {
   try {
     // Extract base64 data from data URL
     const base64Data = booth.businessCardData.split(',')[1];
-    const mediaType = booth.businessCardData.split(';')[0].split(':')[1] || 'image/jpeg';
     
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(OCR_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64Data
-              }
-            },
-            {
-              type: 'text',
-              text: 'Extract contact information from this business card. Return ONLY a JSON object with these fields (use null for missing info): {"name": "full name", "email": "email address", "phone": "phone number", "title": "job title", "company": "company name"}. Return only the JSON, no other text.'
-            }
-          ]
-        }]
-      })
+      body: JSON.stringify({ image: base64Data })
     });
     
     if (!response.ok) {
@@ -1299,14 +1276,11 @@ async function scanBusinessCard() {
       throw new Error(`API error: ${response.status} - ${errText}`);
     }
     
-    const data = await response.json();
-    const text = data.content[0].text;
+    const extracted = await response.json();
     
-    // Parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Could not parse OCR response');
-    
-    const extracted = JSON.parse(jsonMatch[0]);
+    if (extracted.error) {
+      throw new Error(extracted.error);
+    }
     
     // Update fields
     if (extracted.name) {
