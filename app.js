@@ -90,9 +90,48 @@ function getStatusIcon(status) {
 }
 
 // Helper to determine hall/level from booth number
-function getBoothHall(boothNumber) {
+// Uses per-show hall_config if available, otherwise falls back to defaults
+function getBoothHall(boothNumber, showId) {
   if (!boothNumber) return null;
   const num = boothNumber.toString().toUpperCase().trim();
+  
+  // Get show-specific hall config
+  const show = shows.find(s => s.id === (showId || currentShowId));
+  const hallConfig = show?.hallConfig || show?.hall_config;
+  
+  // If show has custom hall config, use it
+  if (hallConfig && hallConfig.rules && hallConfig.rules.length > 0) {
+    for (const rule of hallConfig.rules) {
+      if (rule.prefix && num.startsWith(rule.prefix.toUpperCase())) {
+        // Check numeric range if specified
+        if (rule.minNum !== undefined || rule.maxNum !== undefined) {
+          const numericPart = parseInt(num.substring(rule.prefix.length));
+          if (!isNaN(numericPart)) {
+            const min = rule.minNum ?? 0;
+            const max = rule.maxNum ?? 999999;
+            if (numericPart >= min && numericPart <= max) {
+              return { hall: rule.hall, level: rule.level || '', category: rule.category || '' };
+            }
+          }
+        } else {
+          return { hall: rule.hall, level: rule.level || '', category: rule.category || '' };
+        }
+      } else if (!rule.prefix && rule.minNum !== undefined) {
+        // Numeric-only rule (no prefix)
+        const numericBooth = parseInt(num);
+        if (!isNaN(numericBooth)) {
+          const min = rule.minNum ?? 0;
+          const max = rule.maxNum ?? 999999;
+          if (numericBooth >= min && numericBooth <= max) {
+            return { hall: rule.hall, level: rule.level || '', category: rule.category || '' };
+          }
+        }
+      }
+    }
+    return null; // Show has config but booth didn't match any rule
+  }
+  
+  // === FALLBACK: Expo West default config (for backward compatibility) ===
   
   // F prefix booths (Plaza/Food area)
   if (num.startsWith('F')) {
@@ -139,6 +178,41 @@ function getBoothHall(boothNumber) {
   if (numericBooth >= 300 && numericBooth <= 1334) return { hall: 'Hall A', level: 'Level 1', category: 'Natural & Specialty Foods' };
   
   return null;
+}
+
+// Render hall config rules for admin UI
+function renderHallRules(hallConfig) {
+  if (!hallConfig || !hallConfig.rules || hallConfig.rules.length === 0) {
+    return '<p style="color: var(--text-muted); font-size: 13px;">No hall rules configured. Click "Add Rule" to create mappings.</p>';
+  }
+  
+  return hallConfig.rules.map((rule, idx) => `
+    <div class="hall-rule-row">
+      <input type="text" class="input hall-prefix" placeholder="Prefix" value="${rule.prefix || ''}" style="width: 60px;">
+      <input type="number" class="input hall-min" placeholder="Min #" value="${rule.minNum ?? ''}" style="width: 70px;">
+      <input type="number" class="input hall-max" placeholder="Max #" value="${rule.maxNum ?? ''}" style="width: 70px;">
+      <input type="text" class="input hall-name" placeholder="Hall Name" value="${rule.hall || ''}" style="flex: 1;">
+      <input type="text" class="input hall-category" placeholder="Category" value="${rule.category || ''}" style="flex: 1;">
+      <button class="btn-icon delete-rule-btn"><i class="fas fa-trash"></i></button>
+    </div>
+  `).join('');
+}
+
+// Update HALL_OPTIONS based on show's hall config
+function updateHallOptionsForShow(show) {
+  const hallConfig = show?.hallConfig || show?.hall_config;
+  
+  if (hallConfig && hallConfig.rules && hallConfig.rules.length > 0) {
+    // Get unique hall names from config
+    const uniqueHalls = [...new Set(hallConfig.rules.map(r => r.hall).filter(Boolean))];
+    
+    // Rebuild HALL_OPTIONS with 'All Halls' first
+    HALL_OPTIONS.length = 0;
+    HALL_OPTIONS.push({ value: 'all', label: 'All Halls' });
+    uniqueHalls.forEach(hall => {
+      HALL_OPTIONS.push({ value: hall, label: hall });
+    });
+  }
 }
 
 // Format follower count
@@ -1919,6 +1993,16 @@ function showAdminTab(tab) {
       </div>
       
       <div class="admin-section" style="margin-top: 24px;">
+        <h4 style="margin-bottom: 12px;">Hall / Booth Mapping</h4>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Configure how booth numbers map to halls for filtering. Each rule matches booths by prefix and/or numeric range.</p>
+        <div id="hall-rules-list" class="hall-rules-list">
+          ${renderHallRules(show.hallConfig || show.hall_config)}
+        </div>
+        <button class="btn secondary" id="add-hall-rule-btn" style="margin-top: 8px;"><i class="fas fa-plus"></i> Add Rule</button>
+        <button class="btn primary full" id="save-hall-config-btn" style="margin-top: 12px;"><i class="fas fa-save"></i> Save Hall Config</button>
+      </div>
+      
+      <div class="admin-section" style="margin-top: 24px;">
         <h4 style="margin-bottom: 12px;">Reps Attending This Show</h4>
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Unchecked reps won't appear in hit lists or dashboard for this show.</p>
         <div class="rep-roster-list">
@@ -1941,6 +2025,54 @@ function showAdminTab(tab) {
       await saveShow(show);
       shows = await getShows();
       alert('URLs saved!');
+    });
+    
+    // Hall config event listeners
+    document.getElementById('add-hall-rule-btn').addEventListener('click', () => {
+      const list = document.getElementById('hall-rules-list');
+      const ruleIndex = list.querySelectorAll('.hall-rule-row').length;
+      const newRow = document.createElement('div');
+      newRow.className = 'hall-rule-row';
+      newRow.innerHTML = `
+        <input type="text" class="input hall-prefix" placeholder="Prefix (e.g. N, C)" style="width: 60px;">
+        <input type="number" class="input hall-min" placeholder="Min #" style="width: 70px;">
+        <input type="number" class="input hall-max" placeholder="Max #" style="width: 70px;">
+        <input type="text" class="input hall-name" placeholder="Hall Name" style="flex: 1;">
+        <input type="text" class="input hall-category" placeholder="Category" style="flex: 1;">
+        <button class="btn-icon delete-rule-btn"><i class="fas fa-trash"></i></button>
+      `;
+      list.appendChild(newRow);
+      newRow.querySelector('.delete-rule-btn').addEventListener('click', () => newRow.remove());
+    });
+    
+    document.getElementById('save-hall-config-btn').addEventListener('click', async () => {
+      const rules = [];
+      document.querySelectorAll('.hall-rule-row').forEach(row => {
+        const prefix = row.querySelector('.hall-prefix')?.value?.trim().toUpperCase() || '';
+        const minNum = row.querySelector('.hall-min')?.value ? parseInt(row.querySelector('.hall-min').value) : undefined;
+        const maxNum = row.querySelector('.hall-max')?.value ? parseInt(row.querySelector('.hall-max').value) : undefined;
+        const hall = row.querySelector('.hall-name')?.value?.trim() || '';
+        const category = row.querySelector('.hall-category')?.value?.trim() || '';
+        
+        if (hall) { // Only add if hall name is provided
+          rules.push({ prefix, minNum, maxNum, hall, category });
+        }
+      });
+      
+      show.hallConfig = { rules };
+      show.hall_config = { rules };
+      await saveShow(show);
+      shows = await getShows();
+      
+      // Update HALL_OPTIONS based on new config
+      updateHallOptionsForShow(show);
+      
+      alert('Hall configuration saved!');
+    });
+    
+    // Add delete handlers to existing rules
+    document.querySelectorAll('.delete-rule-btn').forEach(btn => {
+      btn.addEventListener('click', () => btn.closest('.hall-rule-row').remove());
     });
     
     document.getElementById('save-roster-btn').addEventListener('click', async () => {
