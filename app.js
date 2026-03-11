@@ -1452,6 +1452,8 @@ function showSubmitModal(type) {
       campaign: `${show?.name || 'Trade Show'} - 2026`,
       hasBusinessCard: !!booth.businessCardData,
       businessCardUrl: booth.businessCardUrl || '',
+      recordId: booth.recordId || '',
+      hubspotCompanyUrl: booth.hubspotUrl || booth.hubspot_url || '',
       type: type
     };
     
