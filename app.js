@@ -1243,7 +1243,7 @@ const WEBHOOK_URLS = {
 };
 
 // OCR Edge Function URL
-const OCR_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/ocr-scan`;
+const OCR_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/hyper-processor`;
 
 // OCR Business Card using Supabase Edge Function
 async function scanBusinessCard() {
