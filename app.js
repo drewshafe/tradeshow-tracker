@@ -1898,28 +1898,37 @@ async function renderDashboard() {
   const container = document.getElementById('dashboard-content');
   
   const totals = stats.reduce((acc, s) => ({
-    toVisit: acc.toVisit + s.toVisit, followUp: acc.followUp + s.followUp,
-    demos: acc.demos + s.demos, dq: acc.dq + s.dq, total: acc.total + s.total
-  }), { toVisit: 0, followUp: 0, demos: 0, dq: 0, total: 0 });
+    demos: acc.demos + s.demos, 
+    followUp: acc.followUp + s.followUp,
+    notAtShow: acc.notAtShow + s.notAtShow, 
+    businessCards: acc.businessCards + s.businessCards
+  }), { demos: 0, followUp: 0, notAtShow: 0, businessCards: 0 });
 
   container.innerHTML = `
     <div class="dashboard-totals">
-      <div class="total-card"><span class="total-value">${totals.total}</span><label>Total</label></div>
-      <div class="total-card red"><span class="total-value">${totals.toVisit}</span><label>To Visit</label></div>
-      <div class="total-card yellow"><span class="total-value">${totals.followUp}</span><label>Follow Up</label></div>
       <div class="total-card green"><span class="total-value">${totals.demos}</span><label>Demos</label></div>
+      <div class="total-card yellow"><span class="total-value">${totals.followUp}</span><label>Follow Ups</label></div>
+      <div class="total-card"><span class="total-value">${totals.notAtShow}</span><label>Not at Show</label></div>
+      <div class="total-card blue"><span class="total-value">${totals.businessCards}</span><label>Biz Cards</label></div>
     </div>
     <div class="section-title" style="padding:16px 16px 8px">Rep Rankings</div>
     <div class="leaderboard">
       ${stats.map((s, i) => `
         <div class="leaderboard-row">
-          <span class="rank">${i + 1}</span>
+          <span class="rank ${i === 0 ? 'first' : ''}">${i + 1}</span>
           <span class="rep-name">${s.repName}</span>
           <div class="rep-stats">
             <span class="stat-pill green">${s.demos} demos</span>
-            <span class="stat-pill yellow">${s.followUp} follow</span>
-            <span class="stat-pill red">${s.toVisit} left</span>
+            <span class="stat-pill orange">${s.followUpWarm} warm</span>
+            <span class="stat-pill blue">${s.followUpCold} cold</span>
           </div>
+        </div>
+        <div class="rep-details">
+          <span class="detail-stat"><i class="fas fa-redo-alt"></i> ${s.comeBack} come back</span>
+          <span class="detail-stat"><i class="fas fa-thumbs-down"></i> ${s.notInterested} not interested</span>
+          <span class="detail-stat"><i class="fas fa-ban"></i> ${s.dq} DQ</span>
+          <span class="detail-stat"><i class="fas fa-store-slash"></i> ${s.notAtShow} not at show</span>
+          <span class="detail-stat"><i class="fas fa-id-card"></i> ${s.businessCards} cards</span>
         </div>
       `).join('')}
     </div>
