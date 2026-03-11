@@ -421,9 +421,15 @@
         repId: rep.id,
         repName: rep.name,
         toVisit: toVisitFiltered.length,
-        followUp: combined.filter(b => b.status === STATUS.FOLLOW_UP).length,
+        followUpWarm: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM).length,
+        followUpCold: combined.filter(b => b.status === STATUS.FOLLOW_UP_COLD).length,
+        followUp: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_COLD).length,
         demos: combined.filter(b => b.status === STATUS.DEMO_BOOKED).length,
+        notInterested: combined.filter(b => b.status === STATUS.NOT_INTERESTED).length,
         dq: combined.filter(b => b.status === STATUS.DQ).length,
+        notAtShow: combined.filter(b => b.status === STATUS.NOT_AT_SHOW).length,
+        comeBack: combined.filter(b => b.status === STATUS.COME_BACK).length,
+        businessCards: combined.filter(b => b.businessCardData || b.businessCardUrl).length,
         total: combined.length,
         hitListCount: hitList.length,
         workingCount: working.length,
@@ -431,7 +437,7 @@
       };
     });
     
-    stats.sort((a, b) => b.demos !== a.demos ? b.demos - a.demos : b.followUp - a.followUp);
+    stats.sort((a, b) => b.demos !== a.demos ? b.demos - a.demos : (b.followUpWarm !== a.followUpWarm ? b.followUpWarm - a.followUpWarm : b.followUpCold - a.followUpCold));
     return stats;
   };
 
