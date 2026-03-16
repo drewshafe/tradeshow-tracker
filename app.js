@@ -1169,9 +1169,9 @@ async function showDetailView(id) {
   document.getElementById('scan-card-btn')?.addEventListener('click', scanBusinessCard);
   document.getElementById('remove-card-btn')?.addEventListener('click', removeCard);
   
-  document.getElementById('submit-followup-btn').addEventListener('click', () => showSubmitModal('followup'));
-  document.getElementById('submit-demo-btn').addEventListener('click', () => showSubmitModal('demo'));
-  document.getElementById('submit-note-btn').addEventListener('click', () => showSubmitModal('ocr_note'));
+  document.getElementById('submit-followup-btn')?.addEventListener('click', () => showSubmitModal('followup'));
+  document.getElementById('submit-demo-btn')?.addEventListener('click', () => showSubmitModal('demo'));
+  document.getElementById('submit-note-btn')?.addEventListener('click', () => showSubmitModal('ocr_note'));
   
   // File upload listeners
   document.getElementById('upload-files-btn')?.addEventListener('click', () => {
@@ -1514,9 +1514,9 @@ function showSubmitModal(type) {
     if (isDemo) {
       const demoDateInput = modal.querySelector('#submit-demo-date').value;
       payload.demoDate = demoDateInput || '';
-    } else {
-      // Follow up - add task date with 9:00 AM MST
-      const taskDateInput = modal.querySelector('#submit-task-date').value;
+    } else if (!isNote) {
+      // Follow up - add task date with 9:00 AM MST (not for ocr_note)
+      const taskDateInput = modal.querySelector('#submit-task-date')?.value;
       if (taskDateInput) {
         payload.taskDate = `${taskDateInput}T09:00:00-07:00`; // 9:00 AM MST
       }
@@ -1562,10 +1562,10 @@ function showSubmitModal(type) {
         iframe.remove();
       }, 2000);
       
-      // Update booth status
+      // Update booth status (not for ocr_note - just creates a note)
       if (isDemo) {
         await setStatus(STATUS.DEMO_BOOKED);
-      } else {
+      } else if (!isNote) {
         // Set warm or cold follow up based on user selection
         const newStatus = followUpType === 'cold' ? STATUS.FOLLOW_UP_COLD : STATUS.FOLLOW_UP_WARM;
         await setStatus(newStatus);
@@ -1578,12 +1578,15 @@ function showSubmitModal(type) {
       await saveBooth(booth);
       
       modal.remove();
-      alert(`${isDemo ? 'Demo' : 'Follow Up'} submitted successfully!`);
+      const successMsg = isDemo ? 'Demo' : isNote ? 'HubSpot Note' : 'Follow Up';
+      alert(`${successMsg} submitted successfully!`);
     } catch (err) {
       console.error('Webhook error:', err);
-      alert('Error submitting. Please try again or use Copy button.');
+      alert('Error submitting. Please try again.');
       modal.querySelector('#submit-webhook-btn').disabled = false;
-      modal.querySelector('#submit-webhook-btn').innerHTML = `<i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}`;
+      const btnText = isDemo ? 'Demo' : isNote ? 'Create Note' : 'Follow Up';
+      const btnIcon = isNote ? 'fab fa-hubspot' : 'fas fa-paper-plane';
+      modal.querySelector('#submit-webhook-btn').innerHTML = `<i class="${btnIcon}"></i> Submit ${btnText}`;
     }
   });
 }
