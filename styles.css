@@ -399,6 +399,8 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .submit-btn.webhook:hover { background: linear-gradient(135deg, #059669, #047857); }
 .submit-btn.webhook.demo { background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-color: #7c3aed; }
 .submit-btn.webhook.demo:hover { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.submit-btn.webhook.hubspot-note { background: linear-gradient(135deg, #ff7a59, #ff5c35); border-color: #ff5c35; }
+.submit-btn.webhook.hubspot-note:hover { background: linear-gradient(135deg, #ff5c35, #e64a2e); }
 
 /* Calendar Embed */
 .calendar-embed-container {
