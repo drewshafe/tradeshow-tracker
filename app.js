@@ -1094,8 +1094,19 @@ async function showDetailView(id) {
     </div>
 
     <div class="section">
-      <div class="section-title">Contact Info</div>
+      <div class="section-title">
+        Contact Info
+        ${booth.recordId ? '<span class="crm-badge"><i class="fab fa-hubspot"></i> In CRM</span>' : ''}
+        ${booth.contactName || booth.contactEmail ? '<span class="ocr-badge"><i class="fas fa-magic"></i> OCR</span>' : ''}
+      </div>
       <input type="text" class="input" id="contact-name" placeholder="Contact name..." value="${booth.contactName || ''}">
+      <input type="text" class="input" id="contact-title" placeholder="Title (e.g., Director of E-commerce)..." value="${booth.contactTitle || ''}" style="margin-top: 8px;">
+      <input type="email" class="input" id="contact-email" placeholder="Email..." value="${booth.contactEmail || ''}" style="margin-top: 8px;">
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <input type="tel" class="input" id="contact-phone" placeholder="Phone..." value="${booth.contactPhone || ''}" style="flex: 2;">
+        <input type="text" class="input" id="contact-ext" placeholder="Ext" value="${booth.contactExt || ''}" style="flex: 1;">
+      </div>
+      ${booth.contactOther ? `<textarea class="input" id="contact-other" readonly style="margin-top: 8px; background: var(--bg-secondary); font-size: 12px;" rows="2">${booth.contactOther}</textarea>` : ''}
       <div class="picker-row">
         <button class="picker-btn" id="orders-picker-btn"><label>Orders/mo</label><span id="orders-value">${booth.ordersPerMonth || 'N/A'}</span><i class="fas fa-chevron-down"></i></button>
         <button class="picker-btn" id="aov-picker-btn"><label>AOV</label><span id="aov-value">${booth.aov || 'N/A'}</span><i class="fas fa-chevron-down"></i></button>
@@ -1144,6 +1155,10 @@ async function showDetailView(id) {
   });
   
   document.getElementById('contact-name').addEventListener('change', (e) => updateBoothField('contactName', e.target.value));
+  document.getElementById('contact-title')?.addEventListener('change', (e) => updateBoothField('contactTitle', e.target.value));
+  document.getElementById('contact-email')?.addEventListener('change', (e) => updateBoothField('contactEmail', e.target.value));
+  document.getElementById('contact-phone')?.addEventListener('change', (e) => updateBoothField('contactPhone', e.target.value));
+  document.getElementById('contact-ext')?.addEventListener('change', (e) => updateBoothField('contactExt', e.target.value));
   document.getElementById('notes-input').addEventListener('change', (e) => updateBoothField('notes', e.target.value));
   
   document.getElementById('orders-picker-btn').addEventListener('click', () => togglePicker('orders'));
@@ -1296,6 +1311,12 @@ async function scanBusinessCard() {
     if (extracted.title) {
       booth.contactTitle = extracted.title;
     }
+    if (extracted.ext) {
+      booth.contactExt = extracted.ext;
+    }
+    if (extracted.other) {
+      booth.contactOther = extracted.other;
+    }
     
     await saveBooth(booth);
     
@@ -1303,7 +1324,7 @@ async function scanBusinessCard() {
     const summary = [
       extracted.name && `Name: ${extracted.name}`,
       extracted.email && `Email: ${extracted.email}`,
-      extracted.phone && `Phone: ${extracted.phone}`,
+      extracted.phone && `Phone: ${extracted.phone}${extracted.ext ? ' x' + extracted.ext : ''}`,
       extracted.title && `Title: ${extracted.title}`
     ].filter(Boolean).join('\n');
     
@@ -1383,7 +1404,20 @@ function showSubmitModal(type) {
           </div>
           `}
           
-          <!-- Lead data below -->
+          <!-- Orders & AOV first -->
+          <div class="form-group">
+            <label>Avg Monthly Store Orders</label>
+            <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
+          </div>
+          <div class="form-group">
+            <label>AOV</label>
+            <input type="text" class="input" id="submit-aov" value="${booth.aov || ''}" placeholder="e.g., $50 - $100">
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+          <div class="section-label" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Contact Info ${booth.contactName || booth.contactEmail ? '<span style="color: var(--green);"><i class="fas fa-magic"></i> OCR</span>' : ''}</div>
+          
+          <!-- Contact Info section -->
           <div class="form-group">
             <label>Company Name</label>
             <input type="text" class="input" id="submit-company" value="${booth.companyName || ''}" readonly>
@@ -1393,21 +1427,32 @@ function showSubmitModal(type) {
             <input type="text" class="input" id="submit-contact-name" value="${booth.contactName || ''}" placeholder="e.g., John Smith">
           </div>
           <div class="form-group">
+            <label>Title</label>
+            <input type="text" class="input" id="submit-contact-title" value="${booth.contactTitle || ''}" placeholder="e.g., Director of E-commerce">
+          </div>
+          <div class="form-group">
             <label>Contact Email</label>
             <input type="email" class="input" id="submit-contact-email" value="${booth.contactEmail || ''}" placeholder="e.g., john@company.com">
           </div>
-          <div class="form-group">
-            <label>Contact Phone</label>
-            <input type="tel" class="input" id="submit-contact-phone" value="${booth.contactPhone || ''}" placeholder="e.g., 555-123-4567">
+          <div class="form-row" style="display: flex; gap: 12px;">
+            <div class="form-group" style="flex: 2;">
+              <label>Contact Phone</label>
+              <input type="tel" class="input" id="submit-contact-phone" value="${booth.contactPhone || ''}" placeholder="e.g., 555-123-4567">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label>Ext</label>
+              <input type="text" class="input" id="submit-contact-ext" value="${booth.contactExt || ''}" placeholder="e.g., 123">
+            </div>
           </div>
+          ${booth.contactOther ? `
           <div class="form-group">
-            <label>Avg Monthly Store Orders</label>
-            <input type="text" class="input" id="submit-orders" value="${booth.ordersPerMonth || ''}" placeholder="e.g., 500 - 1,000">
+            <label>Other (from OCR)</label>
+            <textarea class="input" id="submit-contact-other" rows="2" readonly style="background: var(--bg); font-size: 12px;">${booth.contactOther || ''}</textarea>
           </div>
-          <div class="form-group">
-            <label>AOV</label>
-            <input type="text" class="input" id="submit-aov" value="${booth.aov || ''}" placeholder="e.g., $50 - $100">
-          </div>
+          ` : ''}
+          
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+          
           <div class="form-group">
             <label>Notes</label>
             <textarea class="input" id="submit-notes" rows="3" placeholder="Add any notes...">${booth.notes || ''}</textarea>
@@ -1441,8 +1486,10 @@ function showSubmitModal(type) {
       boothNumber: booth.boothNumber || '',
       domain: booth.domain || '',
       contactName: modal.querySelector('#submit-contact-name').value,
+      contactTitle: modal.querySelector('#submit-contact-title')?.value || '',
       contactEmail: modal.querySelector('#submit-contact-email').value,
       contactPhone: modal.querySelector('#submit-contact-phone').value,
+      contactExt: modal.querySelector('#submit-contact-ext')?.value || '',
       ordersPerMonth: modal.querySelector('#submit-orders').value,
       aov: modal.querySelector('#submit-aov').value,
       notes: modal.querySelector('#submit-notes').value,
@@ -2480,7 +2527,7 @@ async function confirmMapping() {
       
       // Fields that should NEVER be overwritten in merge mode
       const protectedFields = ['status', 'notes', 'contactName', 'contactEmail', 'contactPhone', 
-                               'contactTitle', 'ordersPerMonth', 'aov', 'businessCardData', 
+                               'contactTitle', 'contactExt', 'contactOther', 'ordersPerMonth', 'aov', 'businessCardData', 
                                'claimedBy', 'tag', 'id', 'showId', 'repId', 'listType'];
       
       // Fields that CAN be enriched (only if currently empty)
