@@ -1130,16 +1130,12 @@ async function showDetailView(id) {
     </div>
 
     <div class="section">
-      <div class="section-title">Submit to Slack</div>
+      <div class="section-title">Submit to HubSpot</div>
       <div class="submit-row">
-        <button class="submit-btn" id="copy-followup-btn"><i class="fas fa-copy"></i> Copy for Follow Up</button>
-        <button class="submit-btn demo" id="copy-demo-btn"><i class="fas fa-copy"></i> Copy for Demo</button>
-      </div>
-      <div class="submit-row" style="margin-top: 8px;">
         <button class="submit-btn webhook" id="submit-followup-btn"><i class="fas fa-paper-plane"></i> Submit Follow Up</button>
         <button class="submit-btn webhook demo" id="submit-demo-btn"><i class="fas fa-paper-plane"></i> Submit Demo</button>
       </div>
-      <button class="slack-btn" id="open-slack-btn"><i class="fab fa-slack"></i> Open Slack Workflow <i class="fas fa-external-link-alt" style="font-size:12px;opacity:0.6"></i></button>
+      <button class="submit-btn webhook hubspot-note" id="submit-note-btn" style="margin-top: 8px; width: 100%;"><i class="fab fa-hubspot"></i> Create HubSpot Note</button>
     </div>
 
     ${getAlignedSection()}
@@ -1173,11 +1169,9 @@ async function showDetailView(id) {
   document.getElementById('scan-card-btn')?.addEventListener('click', scanBusinessCard);
   document.getElementById('remove-card-btn')?.addEventListener('click', removeCard);
   
-  document.getElementById('copy-followup-btn').addEventListener('click', copyForFollowUp);
-  document.getElementById('copy-demo-btn').addEventListener('click', copyForDemo);
   document.getElementById('submit-followup-btn').addEventListener('click', () => showSubmitModal('followup'));
   document.getElementById('submit-demo-btn').addEventListener('click', () => showSubmitModal('demo'));
-  document.getElementById('open-slack-btn').addEventListener('click', openSlack);
+  document.getElementById('submit-note-btn').addEventListener('click', () => showSubmitModal('ocr_note'));
   
   // File upload listeners
   document.getElementById('upload-files-btn')?.addEventListener('click', () => {
@@ -1254,7 +1248,8 @@ function copyForDemo() {
 // Webhook URLs
 const WEBHOOK_URLS = {
   demo: 'https://hooks.zapier.com/hooks/catch/17560963/u0aled7/',
-  followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/'
+  followup: 'https://hooks.zapier.com/hooks/catch/17560963/u0lktl4/',
+  ocr_note: 'https://hooks.zapier.com/hooks/catch/17560963/upbjwin/'
 };
 
 // OCR Edge Function URL
@@ -1357,13 +1352,25 @@ function showSubmitModal(type) {
   
   const show = shows.find(s => s.id === currentShowId);
   const isDemo = type === 'demo';
+  const isNote = type === 'ocr_note';
+  
+  // Determine modal title and button text
+  let modalTitle = 'Submit Follow Up';
+  let buttonText = 'Submit Follow Up';
+  if (isDemo) {
+    modalTitle = 'Submit Demo Booked';
+    buttonText = 'Submit Demo';
+  } else if (isNote) {
+    modalTitle = 'Create HubSpot Note';
+    buttonText = 'Create Note';
+  }
   
   const modal = document.createElement('div');
   modal.className = 'modal submit-modal';
   modal.innerHTML = `
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Submit ${isDemo ? 'Demo Booked' : 'Follow Up'}</h2>
+        <h2>${modalTitle}</h2>
         <button class="icon-btn close-modal-btn"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
@@ -1379,18 +1386,18 @@ function showSubmitModal(type) {
             </select>
           </div>
           <button class="btn primary full" id="submit-webhook-btn" style="margin-top: 8px; margin-bottom: 16px;">
-            <i class="fas fa-paper-plane"></i> Submit ${isDemo ? 'Demo' : 'Follow Up'}
+            <i class="${isNote ? 'fab fa-hubspot' : 'fas fa-paper-plane'}"></i> ${buttonText}
           </button>
           
           <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 0 16px;">
           
-          <!-- Date field -->
+          <!-- Date field (not shown for ocr_note) -->
           ${isDemo ? `
           <div class="form-group">
             <label>Demo Date</label>
             <input type="datetime-local" class="input" id="submit-demo-date">
           </div>
-          ` : `
+          ` : isNote ? '' : `
           <div class="form-group">
             <label>Follow Up Task Date</label>
             <input type="date" class="input" id="submit-task-date" value="${getDefaultTaskDate()}">
