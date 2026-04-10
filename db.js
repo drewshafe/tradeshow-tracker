@@ -42,14 +42,15 @@
 
   window.saveShow = async function(show) {
     if (useSupabase) {
-      await sbClient.from('shows').upsert({
+      const { error: showSaveError } = await sbClient.from('shows').upsert({
         id: show.id, name: show.name, location: show.location,
-        start_date: show.startDate, end_date: show.endDate,
-        website: show.website, exhibitor_list: show.exhibitorList,
+        start_date: show.startDate || null, end_date: show.endDate || null,
+        website: show.website || null, exhibitor_list: show.exhibitorList || null,
         reps: show.reps || null,
         aligned_room_url: show.alignedRoomUrl || null,
         hall_config: show.hallConfig || show.hall_config || null
       });
+      if (showSaveError) console.error('saveShow error:', showSaveError);
     } else {
       const shows = await window.getShows();
       const idx = shows.findIndex(s => s.id === show.id);
