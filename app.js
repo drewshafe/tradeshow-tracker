@@ -2229,8 +2229,10 @@ function showAdminTab(tab) {
 async function addShowPrompt() {
   const name = prompt('Show name:'); if (!name) return;
   const location = prompt('Location:') || '';
-  const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-  await saveShow({ id, name, location, startDate: '', endDate: '', website: '', exhibitorList: '' });
+  const startDate = prompt('Start date (YYYY-MM-DD):') || null;
+  const endDate = prompt('End date (YYYY-MM-DD):') || null;
+  const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().getFullYear();
+  await saveShow({ id, name, location, startDate, endDate, website: '', exhibitorList: '' });
   shows = await getShows();
   showAdminTab('shows');
   renderShowList();
