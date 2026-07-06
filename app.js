@@ -1204,6 +1204,7 @@ async function setStatus(status) {
     booth.status = status;
     await saveBooth(booth);
     showDetailView(currentBoothId);
+    renderBoothList();
   }
 }
 
