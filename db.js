@@ -42,15 +42,14 @@
 
   window.saveShow = async function(show) {
     if (useSupabase) {
-      const { error: showSaveError } = await sbClient.from('shows').upsert({
+      await sbClient.from('shows').upsert({
         id: show.id, name: show.name, location: show.location,
-        start_date: show.startDate || null, end_date: show.endDate || null,
-        website: show.website || null, exhibitor_list: show.exhibitorList || null,
+        start_date: show.startDate, end_date: show.endDate,
+        website: show.website, exhibitor_list: show.exhibitorList,
         reps: show.reps || null,
         aligned_room_url: show.alignedRoomUrl || null,
         hall_config: show.hallConfig || show.hall_config || null
       });
-      if (showSaveError) console.error('saveShow error:', showSaveError);
     } else {
       const shows = await window.getShows();
       const idx = shows.findIndex(s => s.id === show.id);
@@ -434,9 +433,9 @@
         repId: rep.id,
         repName: rep.name,
         toVisit: toVisitFiltered.length,
-        followUpWarm: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM).length,
+        followUpWarm: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_WARM_DIRECT || b.status === STATUS.FOLLOW_UP_WARM_INTRO).length,
         followUpCold: combined.filter(b => b.status === STATUS.FOLLOW_UP_COLD).length,
-        followUp: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_COLD).length,
+        followUp: combined.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_WARM_DIRECT || b.status === STATUS.FOLLOW_UP_WARM_INTRO || b.status === STATUS.FOLLOW_UP_COLD).length,
         demos: combined.filter(b => b.status === STATUS.DEMO_BOOKED).length,
         notInterested: combined.filter(b => b.status === STATUS.NOT_INTERESTED).length,
         dq: combined.filter(b => b.status === STATUS.DQ).length,

@@ -9,7 +9,9 @@ const CLAUDE_API_KEY = ''; // Add your Anthropic API key here to enable OCR
 const STATUS = {
   NOT_VISITED: 'not_visited',
   COME_BACK: 'come_back',
-  FOLLOW_UP_WARM: 'follow_up_warm',
+  FOLLOW_UP_WARM: 'follow_up_warm',             // legacy — kept for backward compat
+  FOLLOW_UP_WARM_DIRECT: 'follow_up_warm_direct', // they said call me directly
+  FOLLOW_UP_WARM_INTRO: 'follow_up_warm_intro',   // referred me to someone else
   FOLLOW_UP_COLD: 'follow_up_cold',
   DEMO_BOOKED: 'demo_booked',
   NOT_INTERESTED: 'not_interested',
@@ -21,6 +23,8 @@ const STATUS_LABELS = {
   [STATUS.NOT_VISITED]: 'Not Visited',
   [STATUS.COME_BACK]: 'Come Back',
   [STATUS.FOLLOW_UP_WARM]: 'Warm Follow Up',
+  [STATUS.FOLLOW_UP_WARM_DIRECT]: 'Warm Direct',
+  [STATUS.FOLLOW_UP_WARM_INTRO]: 'Warm Intro',
   [STATUS.FOLLOW_UP_COLD]: 'Cold Follow Up',
   [STATUS.DEMO_BOOKED]: 'Demo Booked',
   [STATUS.NOT_INTERESTED]: 'Not Interested',
@@ -33,6 +37,8 @@ const STATUS_PRIORITY = {
   [STATUS.COME_BACK]: 1,
   [STATUS.NOT_VISITED]: 2,
   [STATUS.FOLLOW_UP_WARM]: 3,
+  [STATUS.FOLLOW_UP_WARM_DIRECT]: 3,
+  [STATUS.FOLLOW_UP_WARM_INTRO]: 3,
   [STATUS.FOLLOW_UP_COLD]: 4,
   [STATUS.DEMO_BOOKED]: 5,
   [STATUS.NOT_INTERESTED]: 6,

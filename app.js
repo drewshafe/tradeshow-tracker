@@ -80,6 +80,8 @@ function getStatusIcon(status) {
     case STATUS.NOT_VISITED: return 'circle';
     case STATUS.COME_BACK: return 'redo-alt';
     case STATUS.FOLLOW_UP_WARM: return 'fire';
+    case STATUS.FOLLOW_UP_WARM_DIRECT: return 'fire';
+    case STATUS.FOLLOW_UP_WARM_INTRO: return 'random';
     case STATUS.FOLLOW_UP_COLD: return 'snowflake';
     case STATUS.DEMO_BOOKED: return 'calendar-check';
     case STATUS.NOT_INTERESTED: return 'thumbs-down';
@@ -769,7 +771,7 @@ function renderBoothList(preserveScroll = false) {
   
   document.getElementById('stat-showing').textContent = filtered.length;
   document.getElementById('stat-tovisit').textContent = booths.filter(b => b.status === STATUS.NOT_VISITED || b.status === STATUS.COME_BACK || !b.status).length;
-  document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_COLD).length;
+  document.getElementById('stat-followup').textContent = booths.filter(b => b.status === STATUS.FOLLOW_UP_WARM || b.status === STATUS.FOLLOW_UP_WARM_DIRECT || b.status === STATUS.FOLLOW_UP_WARM_INTRO || b.status === STATUS.FOLLOW_UP_COLD).length;
   document.getElementById('stat-demos').textContent = booths.filter(b => b.status === STATUS.DEMO_BOOKED).length;
 
   renderActiveFilters();
@@ -1232,7 +1234,7 @@ function copyForFollowUp() {
   if (!booth) return;
   const text = [booth.companyName, booth.ordersPerMonth || 'N/A', booth.aov || 'N/A', booth.notes].filter(Boolean).join('\n');
   navigator.clipboard.writeText(text);
-  if (booth.status === STATUS.NOT_VISITED || booth.status === STATUS.COME_BACK) setStatus(STATUS.FOLLOW_UP_WARM);
+  if (booth.status === STATUS.NOT_VISITED || booth.status === STATUS.COME_BACK) setStatus(STATUS.FOLLOW_UP_WARM_DIRECT);
   alert('Copied for Follow Up workflow');
 }
 
@@ -1405,7 +1407,8 @@ function showSubmitModal(type) {
           <div class="form-group">
             <label>Follow Up Type</label>
             <div class="followup-type-btns">
-              <button type="button" class="followup-type-btn active" data-type="warm"><i class="fas fa-fire"></i> Warm</button>
+              <button type="button" class="followup-type-btn active" data-type="direct"><i class="fas fa-fire"></i> Direct</button>
+              <button type="button" class="followup-type-btn" data-type="intro"><i class="fas fa-random"></i> Intro</button>
               <button type="button" class="followup-type-btn" data-type="cold"><i class="fas fa-snowflake"></i> Cold</button>
             </div>
           </div>
@@ -1473,8 +1476,8 @@ function showSubmitModal(type) {
   modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   
-  // Follow up type toggle (warm/cold)
-  let followUpType = 'warm';
+  // Follow up type toggle (direct/intro/cold)
+  let followUpType = 'direct';
   modal.querySelectorAll('.followup-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       modal.querySelectorAll('.followup-type-btn').forEach(b => b.classList.remove('active'));
@@ -1567,7 +1570,9 @@ function showSubmitModal(type) {
         await setStatus(STATUS.DEMO_BOOKED);
       } else if (!isNote) {
         // Set warm or cold follow up based on user selection
-        const newStatus = followUpType === 'cold' ? STATUS.FOLLOW_UP_COLD : STATUS.FOLLOW_UP_WARM;
+        const newStatus = followUpType === 'cold' ? STATUS.FOLLOW_UP_COLD
+          : followUpType === 'intro' ? STATUS.FOLLOW_UP_WARM_INTRO
+          : STATUS.FOLLOW_UP_WARM_DIRECT;
         await setStatus(newStatus);
       }
       
@@ -1580,6 +1585,10 @@ function showSubmitModal(type) {
       modal.remove();
       const successMsg = isDemo ? 'Demo' : isNote ? 'HubSpot Note' : 'Follow Up';
       alert(`${successMsg} submitted successfully!`);
+      if (!isNote) {
+        renderBoothList();
+        showListView();
+      }
     } catch (err) {
       console.error('Webhook error:', err);
       alert('Error submitting. Please try again.');
@@ -2229,10 +2238,8 @@ function showAdminTab(tab) {
 async function addShowPrompt() {
   const name = prompt('Show name:'); if (!name) return;
   const location = prompt('Location:') || '';
-  const startDate = prompt('Start date (YYYY-MM-DD):') || null;
-  const endDate = prompt('End date (YYYY-MM-DD):') || null;
-  const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().getFullYear();
-  await saveShow({ id, name, location, startDate, endDate, website: '', exhibitorList: '' });
+  const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+  await saveShow({ id, name, location, startDate: '', endDate: '', website: '', exhibitorList: '' });
   shows = await getShows();
   showAdminTab('shows');
   renderShowList();
