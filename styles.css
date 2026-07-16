@@ -562,6 +562,8 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
   color: var(--green);
 }
 .tech-item i { margin-right: 4px; }
+.returns-item { color: #a29bfe; }
+.returns-item i { margin-right: 4px; }
 .social-item i {
   margin-right: 4px;
 }

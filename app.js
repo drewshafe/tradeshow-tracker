@@ -865,6 +865,7 @@ function renderBoothList(preserveScroll = false) {
         <div class="booth-meta">
           <span>${b.platform || 'No platform'}</span>
           ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
+          ${b.returns ? `<span class="returns-item"><i class="fas fa-undo-alt"></i> Returns: ${b.returns}</span>` : ''}
           ${b.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> Tech: ${b.techInstalls}</span>` : ''}
           ${socialDisplay}
           ${visitsDisplay}
