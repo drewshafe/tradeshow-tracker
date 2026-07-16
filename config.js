@@ -70,8 +70,8 @@ const PLATFORMS = [
 ];
 
 // Editable dropdown options for the detail view (curated show-floor pick list)
-const PROTECTION_OPTIONS = ['AfterShip', 'DIY', 'Corso', 'Insurify', 'Loop', 'Navidium', 'Order Protection', 'Onward', 'Route', 'Seel', 'ShipTection'];
-const RETURNS_OPTIONS = ['AfterShip', 'Frate (Route)', 'Loop', 'Happy Returns', 'ReturnsGo', 'Richpanel', 'Swap'];
+const PROTECTION_OPTIONS = ['AfterShip', 'DIY', 'Corso', 'Insurify', 'Loop', 'Navidium', 'Order Protection', 'Onward', 'Redo', 'Route', 'Seel', 'ShipTection'];
+const RETURNS_OPTIONS = ['AfterShip', 'Frate (Route)', 'Loop', 'Happy Returns', 'Redo', 'ReturnsGo', 'Richpanel', 'Swap'];
 
 // Protection Options (used for filtering)
 const PROTECTION_PROVIDERS = [
