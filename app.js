@@ -862,6 +862,7 @@ function renderBoothList(preserveScroll = false) {
         <div class="booth-meta">
           <span>${b.platform || 'No platform'}</span>
           ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
+          ${b.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> Tech: ${b.techInstalls}</span>` : ''}
           ${socialDisplay}
           ${visitsDisplay}
           ${ownerDisplay}
@@ -1096,7 +1097,33 @@ async function showDetailView(id) {
     </div>
 
     <div class="section">
-      <div class="section-title">
+      <div class="section-title">Protection & Returns</div>
+      <div class="form-group">
+        <label>Package Protection</label>
+        <select class="input" id="protection-select">
+          <option value="">None</option>
+          ${PROTECTION_OPTIONS.map(o => `<option value="${o}" ${booth.protection === o ? 'selected' : ''}>${o}</option>`).join('')}
+          <option value="__other__" ${booth.protection && !PROTECTION_OPTIONS.includes(booth.protection) ? 'selected' : ''}>Other...</option>
+        </select>
+        <input type="text" class="input" id="protection-custom" placeholder="Enter provider..."
+          value="${booth.protection && !PROTECTION_OPTIONS.includes(booth.protection) ? booth.protection : ''}"
+          style="margin-top: 8px;${booth.protection && !PROTECTION_OPTIONS.includes(booth.protection) ? '' : ' display:none'}">
+      </div>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Returns</label>
+        <select class="input" id="returns-select">
+          <option value="">None</option>
+          ${RETURNS_OPTIONS.map(o => `<option value="${o}" ${booth.returns === o ? 'selected' : ''}>${o}</option>`).join('')}
+          <option value="__other__" ${booth.returns && !RETURNS_OPTIONS.includes(booth.returns) ? 'selected' : ''}>Other...</option>
+        </select>
+        <input type="text" class="input" id="returns-custom" placeholder="Enter provider..."
+          value="${booth.returns && !RETURNS_OPTIONS.includes(booth.returns) ? booth.returns : ''}"
+          style="margin-top: 8px;${booth.returns && !RETURNS_OPTIONS.includes(booth.returns) ? '' : ' display:none'}">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title" id="contact-section-title">
         Contact Info
         ${booth.recordId ? '<span class="crm-badge"><i class="fab fa-hubspot"></i> In CRM</span>' : ''}
         ${booth.contactName || booth.contactEmail ? '<span class="ocr-badge"><i class="fas fa-magic"></i> OCR</span>' : ''}
@@ -1158,6 +1185,49 @@ async function showDetailView(id) {
   document.getElementById('contact-phone')?.addEventListener('change', (e) => updateBoothField('contactPhone', e.target.value));
   document.getElementById('contact-ext')?.addEventListener('change', (e) => updateBoothField('contactExt', e.target.value));
   document.getElementById('notes-input').addEventListener('change', (e) => updateBoothField('notes', e.target.value));
+
+  // Protection & Returns selects
+  const protectionSelect = document.getElementById('protection-select');
+  const protectionCustom = document.getElementById('protection-custom');
+  protectionSelect?.addEventListener('change', async () => {
+    if (protectionSelect.value === '__other__') {
+      protectionCustom.style.display = '';
+      protectionCustom.focus();
+    } else {
+      protectionCustom.style.display = 'none';
+      booth.protection = protectionSelect.value;
+      await saveBooth(booth);
+      showDetailView(currentBoothId);
+      renderBoothList();
+    }
+  });
+  protectionCustom?.addEventListener('change', async () => {
+    booth.protection = protectionCustom.value;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+    renderBoothList();
+  });
+
+  const returnsSelect = document.getElementById('returns-select');
+  const returnsCustom = document.getElementById('returns-custom');
+  returnsSelect?.addEventListener('change', async () => {
+    if (returnsSelect.value === '__other__') {
+      returnsCustom.style.display = '';
+      returnsCustom.focus();
+    } else {
+      returnsCustom.style.display = 'none';
+      booth.returns = returnsSelect.value;
+      await saveBooth(booth);
+      showDetailView(currentBoothId);
+      renderBoothList();
+    }
+  });
+  returnsCustom?.addEventListener('change', async () => {
+    booth.returns = returnsCustom.value;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+    renderBoothList();
+  });
   
   document.getElementById('orders-picker-btn').addEventListener('click', () => togglePicker('orders'));
   document.getElementById('aov-picker-btn').addEventListener('click', () => togglePicker('aov'));
@@ -1295,25 +1365,29 @@ async function scanBusinessCard() {
       throw new Error(extracted.error);
     }
     
-    // Update fields
-    if (extracted.name) {
-      booth.contactName = extracted.name;
-      document.getElementById('contact-name').value = extracted.name;
-    }
-    if (extracted.email) {
-      booth.contactEmail = extracted.email;
-    }
-    if (extracted.phone) {
-      booth.contactPhone = extracted.phone;
-    }
-    if (extracted.title) {
-      booth.contactTitle = extracted.title;
-    }
-    if (extracted.ext) {
-      booth.contactExt = extracted.ext;
-    }
+    // Update fields in memory and DOM immediately
+    const setField = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+    if (extracted.name) { booth.contactName = extracted.name; setField('contact-name', extracted.name); }
+    if (extracted.email) { booth.contactEmail = extracted.email; setField('contact-email', extracted.email); }
+    if (extracted.phone) { booth.contactPhone = extracted.phone; setField('contact-phone', extracted.phone); }
+    if (extracted.title) { booth.contactTitle = extracted.title; setField('contact-title', extracted.title); }
+    if (extracted.ext) { booth.contactExt = extracted.ext; setField('contact-ext', extracted.ext); }
     if (extracted.other) {
       booth.contactOther = extracted.other;
+      let el = document.getElementById('contact-other');
+      if (!el) {
+        el = document.createElement('textarea');
+        el.className = 'input'; el.id = 'contact-other'; el.readOnly = true; el.rows = 2;
+        el.style.cssText = 'margin-top: 8px; background: var(--bg-secondary); font-size: 12px;';
+        document.getElementById('contact-ext')?.closest('div')?.insertAdjacentElement('afterend', el);
+      }
+      el.value = extracted.other;
+    }
+    if (extracted.name || extracted.email) {
+      const title = document.getElementById('contact-section-title');
+      if (title && !title.querySelector('.ocr-badge')) {
+        title.insertAdjacentHTML('beforeend', '<span class="ocr-badge"><i class="fas fa-magic"></i> OCR</span>');
+      }
     }
     
     await saveBooth(booth);
