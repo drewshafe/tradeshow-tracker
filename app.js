@@ -323,6 +323,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+window.addEventListener('beforeunload', () => releaseCamera());
+
 function setupEventListeners() {
   // Navigation buttons
   document.getElementById('admin-btn').addEventListener('click', showAdminModal);
@@ -450,6 +452,7 @@ async function showDashboard() {
 }
 
 function showListView() {
+  releaseCamera();
   hideAllViews();
   document.getElementById('list-view').classList.add('active');
   // Restore scroll position
@@ -1795,15 +1798,21 @@ function openSlack() {
 // Camera
 async function openCamera() {
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    document.getElementById('camera-video').srcObject = cameraStream;
+    if (!cameraStream || cameraStream.getTracks().every(t => t.readyState === 'ended')) {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      document.getElementById('camera-video').srcObject = cameraStream;
+    }
     document.getElementById('camera-modal').classList.remove('hidden');
   } catch (err) { alert('Camera access denied'); }
 }
 
 function closeCameraModal() {
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
   document.getElementById('camera-modal').classList.add('hidden');
+}
+
+function releaseCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('camera-video').srcObject = null;
 }
 
 async function capturePhoto() {
