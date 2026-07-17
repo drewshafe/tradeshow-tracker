@@ -564,6 +564,12 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .tech-item i { margin-right: 4px; }
 .returns-item { color: #a29bfe; }
 .returns-item i { margin-right: 4px; }
+.helpdesk-item { color: #fdcb6e; }
+.helpdesk-item i { margin-right: 4px; }
+.subscriptions-item { color: #55efc4; }
+.subscriptions-item i { margin-right: 4px; }
+.competitor-inline { color: var(--red); }
+.competitor-inline i { margin-right: 4px; }
 .social-item i {
   margin-right: 4px;
 }

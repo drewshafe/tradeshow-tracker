@@ -865,8 +865,10 @@ function renderBoothList(preserveScroll = false) {
         <div class="booth-meta">
           <span>${b.platform || 'No platform'}</span>
           ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
-          ${b.returns ? `<span class="returns-item"><i class="fas fa-undo-alt"></i> Returns: ${b.returns}</span>` : ''}
-          ${b.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> Tech: ${b.techInstalls}</span>` : ''}
+          ${b.returns ? `<span class="returns-item"><i class="fas fa-undo-alt"></i> ${b.returns}</span>` : ''}
+          ${b.helpDesk ? `<span class="helpdesk-item"><i class="fas fa-headset"></i> ${b.helpDesk}</span>` : ''}
+          ${b.subscriptions ? `<span class="subscriptions-item"><i class="fas fa-sync-alt"></i> ${b.subscriptions}</span>` : ''}
+          ${(b.competitorInstalls || b.competitorUninstalls || b.protection) ? `<span class="tech-item"><i class="fas fa-chart-bar"></i>${b.competitorInstalls ? ` In: ${b.competitorInstalls}` : ''}${b.competitorUninstalls ? ` Out: ${b.competitorUninstalls}` : ''}${b.protection && !b.competitorInstalls && !b.competitorUninstalls ? ` ${b.protection}` : ''}</span>` : ''}
           ${socialDisplay}
           ${visitsDisplay}
           ${ownerDisplay}
@@ -1052,7 +1054,9 @@ async function showDetailView(id) {
       <div class="detail-meta">
         ${booth.platform || 'No platform'}
         ${booth.protection ? `<span class="competitor"> • ${booth.protection}</span>` : '<span class="no-protection"> • No protection</span>'}
-        ${booth.returns ? ` • Returns: ${booth.returns}` : ''}
+        ${booth.returns ? `<span class="returns-item"> • ${booth.returns}</span>` : ''}
+        ${booth.helpDesk ? `<span class="helpdesk-item"> • ${booth.helpDesk}</span>` : ''}
+        ${booth.subscriptions ? `<span class="subscriptions-item"> • ${booth.subscriptions}</span>` : ''}
       </div>
       ${(igFollowers || fbFollowers || visits) ? `
       <div class="detail-social">
@@ -1061,10 +1065,12 @@ async function showDetailView(id) {
         ${visits ? `<span class="social-item"><i class="fas fa-eye"></i> ${visits} visits/mo</span>` : ''}
       </div>
       ` : ''}
-      ${(booth.techInstalls || booth.competitorUninstalls) ? `
+      ${(booth.competitorInstalls || booth.competitorUninstalls || booth.protection || booth.techInstalls) ? `
       <div class="detail-tech">
-        ${booth.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> Tech: ${booth.techInstalls}</span>` : ''}
+        ${booth.competitorInstalls ? `<span class="tech-item"><i class="fas fa-arrow-circle-down"></i> Installs: ${booth.competitorInstalls}</span>` : ''}
         ${booth.competitorUninstalls ? `<span class="tech-item uninstall"><i class="fas fa-trash-alt"></i> Uninstalls: ${booth.competitorUninstalls}</span>` : ''}
+        ${booth.protection ? `<span class="competitor-inline"><i class="fas fa-shield-alt"></i> ${booth.protection}</span>` : ''}
+        ${booth.techInstalls ? `<span class="tech-item"><i class="fas fa-plug"></i> ${booth.techInstalls}</span>` : ''}
       </div>
       ` : ''}
       ${booth.tag ? `<span class="detail-tag ${booth.tag.toLowerCase()}">${booth.tag}</span>` : ''}
@@ -1101,9 +1107,9 @@ async function showDetailView(id) {
     </div>
 
     <div class="section">
-      <div class="section-title">Protection & Returns</div>
+      <div class="section-title">Tech</div>
       <div class="form-group">
-        <label>Package Protection</label>
+        <label>Protection</label>
         <select class="input" id="protection-select">
           <option value="">None</option>
           ${PROTECTION_OPTIONS.map(o => `<option value="${o}" ${booth.protection === o ? 'selected' : ''}>${o}</option>`).join('')}
@@ -1123,6 +1129,28 @@ async function showDetailView(id) {
         <input type="text" class="input" id="returns-custom" placeholder="Enter provider..."
           value="${booth.returns && !RETURNS_OPTIONS.includes(booth.returns) ? booth.returns : ''}"
           style="margin-top: 8px;${booth.returns && !RETURNS_OPTIONS.includes(booth.returns) ? '' : ' display:none'}">
+      </div>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Help Desk</label>
+        <select class="input" id="helpdesk-select">
+          <option value="">None</option>
+          ${HELPDESK_OPTIONS.map(o => `<option value="${o}" ${booth.helpDesk === o ? 'selected' : ''}>${o}</option>`).join('')}
+          <option value="__other__" ${booth.helpDesk && !HELPDESK_OPTIONS.includes(booth.helpDesk) ? 'selected' : ''}>Other...</option>
+        </select>
+        <input type="text" class="input" id="helpdesk-custom" placeholder="Enter provider..."
+          value="${booth.helpDesk && !HELPDESK_OPTIONS.includes(booth.helpDesk) ? booth.helpDesk : ''}"
+          style="margin-top: 8px;${booth.helpDesk && !HELPDESK_OPTIONS.includes(booth.helpDesk) ? '' : ' display:none'}">
+      </div>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Subscriptions</label>
+        <select class="input" id="subscriptions-select">
+          <option value="">None</option>
+          ${SUBSCRIPTIONS_OPTIONS.map(o => `<option value="${o}" ${booth.subscriptions === o ? 'selected' : ''}>${o}</option>`).join('')}
+          <option value="__other__" ${booth.subscriptions && !SUBSCRIPTIONS_OPTIONS.includes(booth.subscriptions) ? 'selected' : ''}>Other...</option>
+        </select>
+        <input type="text" class="input" id="subscriptions-custom" placeholder="Enter provider..."
+          value="${booth.subscriptions && !SUBSCRIPTIONS_OPTIONS.includes(booth.subscriptions) ? booth.subscriptions : ''}"
+          style="margin-top: 8px;${booth.subscriptions && !SUBSCRIPTIONS_OPTIONS.includes(booth.subscriptions) ? '' : ' display:none'}">
       </div>
     </div>
 
@@ -1228,6 +1256,48 @@ async function showDetailView(id) {
   });
   returnsCustom?.addEventListener('change', async () => {
     booth.returns = returnsCustom.value;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+    renderBoothList();
+  });
+
+  const helpdeskSelect = document.getElementById('helpdesk-select');
+  const helpdeskCustom = document.getElementById('helpdesk-custom');
+  helpdeskSelect?.addEventListener('change', async () => {
+    if (helpdeskSelect.value === '__other__') {
+      helpdeskCustom.style.display = '';
+      helpdeskCustom.focus();
+    } else {
+      helpdeskCustom.style.display = 'none';
+      booth.helpDesk = helpdeskSelect.value;
+      await saveBooth(booth);
+      showDetailView(currentBoothId);
+      renderBoothList();
+    }
+  });
+  helpdeskCustom?.addEventListener('change', async () => {
+    booth.helpDesk = helpdeskCustom.value;
+    await saveBooth(booth);
+    showDetailView(currentBoothId);
+    renderBoothList();
+  });
+
+  const subscriptionsSelect = document.getElementById('subscriptions-select');
+  const subscriptionsCustom = document.getElementById('subscriptions-custom');
+  subscriptionsSelect?.addEventListener('change', async () => {
+    if (subscriptionsSelect.value === '__other__') {
+      subscriptionsCustom.style.display = '';
+      subscriptionsCustom.focus();
+    } else {
+      subscriptionsCustom.style.display = 'none';
+      booth.subscriptions = subscriptionsSelect.value;
+      await saveBooth(booth);
+      showDetailView(currentBoothId);
+      renderBoothList();
+    }
+  });
+  subscriptionsCustom?.addEventListener('change', async () => {
+    booth.subscriptions = subscriptionsCustom.value;
     await saveBooth(booth);
     showDetailView(currentBoothId);
     renderBoothList();

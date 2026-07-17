@@ -72,6 +72,8 @@ const PLATFORMS = [
 // Editable dropdown options for the detail view (curated show-floor pick list)
 const PROTECTION_OPTIONS = ['AfterShip', 'DIY', 'Corso', 'Insurify', 'Loop', 'Navidium', 'Order Protection', 'Onward', 'Redo', 'Route', 'Seel', 'ShipTection'];
 const RETURNS_OPTIONS = ['AfterShip', 'Frate (Route)', 'Loop', 'Happy Returns', 'Redo', 'ReturnsGo', 'Richpanel', 'Swap'];
+const HELPDESK_OPTIONS = ['Freshdesk', 'Gladly', 'Gorgias', 'Kustomer', 'Reamaze', 'Richpanel', 'ROI CX Solutions', 'Zendesk'];
+const SUBSCRIPTIONS_OPTIONS = ['Appstle', 'Awtomic', 'Recharge', 'Skio', 'Stay Ai'];
 
 // Protection Options (used for filtering)
 const PROTECTION_PROVIDERS = [
