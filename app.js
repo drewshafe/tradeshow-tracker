@@ -49,7 +49,10 @@ function loadFilters() {
     if (saved) {
       const parsed = JSON.parse(saved);
       filters = { ...DEFAULT_FILTERS, ...parsed };
-      tempFilters = { ...filters, platforms: [...(filters.platforms || [])], statuses: [...(filters.statuses || [])], protections: [...(filters.protections || [])], returns: [...(filters.returns || [])], helpDesks: [...(filters.helpDesks || [])], subscriptions: [...(filters.subscriptions || [])] };
+      // Sanitize: old format stored returns/protection as strings — reset any non-array field to []
+      const arrayFields = ['platforms', 'statuses', 'protections', 'returns', 'helpDesks', 'subscriptions'];
+      arrayFields.forEach(k => { if (!Array.isArray(filters[k])) filters[k] = []; });
+      tempFilters = { ...filters, platforms: [...filters.platforms], statuses: [...filters.statuses], protections: [...filters.protections], returns: [...filters.returns], helpDesks: [...filters.helpDesks], subscriptions: [...filters.subscriptions] };
     } else {
       filters = { ...DEFAULT_FILTERS };
       tempFilters = { ...filters, platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [] };
