@@ -8,9 +8,9 @@ let currentBoothId = null;
 let booths = [];
 let sortBy = 'booth';
 let searchQuery = '';
-const DEFAULT_FILTERS = { platforms: [], statuses: [], protection: 'all', returns: 'all', minRevenue: 0, hall: 'all' };
+const DEFAULT_FILTERS = { platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [], minRevenue: 0, hall: 'all' };
 let filters = { ...DEFAULT_FILTERS };
-let tempFilters = { ...filters, platforms: [], statuses: [] };
+let tempFilters = { ...filters, platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [] };
 let pendingImportData = null;
 let columnMapping = {};
 let cameraStream = null;
@@ -49,17 +49,17 @@ function loadFilters() {
     if (saved) {
       const parsed = JSON.parse(saved);
       filters = { ...DEFAULT_FILTERS, ...parsed };
-      tempFilters = { ...filters, platforms: [...(filters.platforms || [])], statuses: [...(filters.statuses || [])] };
+      tempFilters = { ...filters, platforms: [...(filters.platforms || [])], statuses: [...(filters.statuses || [])], protections: [...(filters.protections || [])], returns: [...(filters.returns || [])], helpDesks: [...(filters.helpDesks || [])], subscriptions: [...(filters.subscriptions || [])] };
     } else {
       filters = { ...DEFAULT_FILTERS };
-      tempFilters = { ...filters, platforms: [], statuses: [] };
+      tempFilters = { ...filters, platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [] };
     }
     const savedSort = localStorage.getItem(`tst_sortBy_${currentShowId}_${currentRepId}`);
     if (savedSort) sortBy = savedSort;
-  } catch (e) { 
+  } catch (e) {
     console.warn('Could not load filters:', e);
     filters = { ...DEFAULT_FILTERS };
-    tempFilters = { ...filters, platforms: [], statuses: [] };
+    tempFilters = { ...filters, platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [] };
   }
 }
 
@@ -702,14 +702,32 @@ function getFilteredBooths() {
     });
   }
 
-  if (filters.protection !== 'all') {
-    if (filters.protection === '[No Protection]') result = result.filter(b => !b.protection);
-    else result = result.filter(b => (b.protection || '').toLowerCase().includes(filters.protection.toLowerCase()));
+  if (filters.protections && filters.protections.length > 0) {
+    result = result.filter(b => {
+      if (filters.protections.includes('[No Protection]') && !b.protection) return true;
+      return filters.protections.includes(b.protection);
+    });
   }
 
-  if (filters.returns !== 'all') {
-    if (filters.returns === '[No Returns]') result = result.filter(b => !b.returns);
-    else result = result.filter(b => (b.returns || '').toLowerCase().includes(filters.returns.toLowerCase()));
+  if (filters.returns && filters.returns.length > 0) {
+    result = result.filter(b => {
+      if (filters.returns.includes('[No Returns]') && !b.returns) return true;
+      return filters.returns.includes(b.returns);
+    });
+  }
+
+  if (filters.helpDesks && filters.helpDesks.length > 0) {
+    result = result.filter(b => {
+      if (filters.helpDesks.includes('[No Help Desk]') && !b.helpDesk) return true;
+      return filters.helpDesks.includes(b.helpDesk);
+    });
+  }
+
+  if (filters.subscriptions && filters.subscriptions.length > 0) {
+    result = result.filter(b => {
+      if (filters.subscriptions.includes('[No Subscriptions]') && !b.subscriptions) return true;
+      return filters.subscriptions.includes(b.subscriptions);
+    });
   }
 
   if (filters.minRevenue > 0) result = result.filter(b => (b.estimatedMonthlySales || 0) >= filters.minRevenue);
@@ -865,10 +883,15 @@ function renderBoothList(preserveScroll = false) {
         <div class="booth-meta">
           <span>${b.platform || 'No platform'}</span>
           ${b.protection ? `<span class="competitor">${b.protection}</span>` : '<span class="no-protection">No protection</span>'}
+        </div>
+        ${(b.returns || b.helpDesk || b.subscriptions || b.competitorInstalls || b.competitorUninstalls) ? `
+        <div class="booth-tech-badges">
           ${b.returns ? `<span class="returns-item"><i class="fas fa-undo-alt"></i> ${b.returns}</span>` : ''}
           ${b.helpDesk ? `<span class="helpdesk-item"><i class="fas fa-headset"></i> ${b.helpDesk}</span>` : ''}
           ${b.subscriptions ? `<span class="subscriptions-item"><i class="fas fa-sync-alt"></i> ${b.subscriptions}</span>` : ''}
-          ${(b.competitorInstalls || b.competitorUninstalls || b.protection) ? `<span class="tech-item"><i class="fas fa-chart-bar"></i>${b.competitorInstalls ? ` In: ${b.competitorInstalls}` : ''}${b.competitorUninstalls ? ` Out: ${b.competitorUninstalls}` : ''}${b.protection && !b.competitorInstalls && !b.competitorUninstalls ? ` ${b.protection}` : ''}</span>` : ''}
+          ${(b.competitorInstalls || b.competitorUninstalls) ? `<span class="tech-item"><i class="fas fa-chart-bar"></i>${b.competitorInstalls ? ` In: ${b.competitorInstalls}` : ''}${b.competitorUninstalls ? ` Out: ${b.competitorUninstalls}` : ''}</span>` : ''}
+        </div>` : ''}
+        <div class="booth-social-row">
           ${socialDisplay}
           ${visitsDisplay}
           ${ownerDisplay}
@@ -919,12 +942,11 @@ function renderActiveFilters() {
   let count = 0;
   let chips = [];
 
-  if (filters.platforms && filters.platforms.length > 0) { 
-    count++; 
-    chips.push({ key: 'platforms', label: filters.platforms.join(', ') }); 
-  }
-  if (filters.protection !== 'all') { count++; chips.push({ key: 'protection', label: filters.protection }); }
-  if (filters.returns !== 'all') { count++; chips.push({ key: 'returns', label: filters.returns }); }
+  if (filters.platforms && filters.platforms.length > 0) { count++; chips.push({ key: 'platforms', label: filters.platforms.join(', ') }); }
+  if (filters.protections && filters.protections.length > 0) { count++; chips.push({ key: 'protections', label: `Protection: ${filters.protections.join(', ')}` }); }
+  if (filters.returns && filters.returns.length > 0) { count++; chips.push({ key: 'returns', label: `Returns: ${filters.returns.join(', ')}` }); }
+  if (filters.helpDesks && filters.helpDesks.length > 0) { count++; chips.push({ key: 'helpDesks', label: `HD: ${filters.helpDesks.join(', ')}` }); }
+  if (filters.subscriptions && filters.subscriptions.length > 0) { count++; chips.push({ key: 'subscriptions', label: `Subs: ${filters.subscriptions.join(', ')}` }); }
   if (filters.minRevenue > 0) { count++; chips.push({ key: 'minRevenue', label: `≥ ${formatCurrency(filters.minRevenue)}` }); }
   if (filters.statuses && filters.statuses.length > 0) { count++; chips.push({ key: 'statuses', label: filters.statuses.length === 1 ? STATUS_LABELS[filters.statuses[0]] : `${filters.statuses.length} statuses` }); }
   if (filters.hall !== 'all') { count++; chips.push({ key: 'hall', label: filters.hall }); }
@@ -941,7 +963,7 @@ function renderActiveFilters() {
       chip.addEventListener('click', () => {
         const key = chip.dataset.filter;
         if (key === 'minRevenue') filters[key] = 0;
-        else if (key === 'platforms') filters[key] = [];
+        else if (['platforms', 'statuses', 'protections', 'returns', 'helpDesks', 'subscriptions'].includes(key)) filters[key] = [];
         else filters[key] = 'all';
         saveFilters();
         renderBoothList();
@@ -1989,28 +2011,48 @@ function hideFilterModal() {
 
 function renderFilterOptions() {
   const container = document.getElementById('filter-options');
-  const platformsSelected = tempFilters.platforms || [];
-  
+  const multiArrayKeys = ['platforms', 'statuses', 'protections', 'returns', 'helpDesks', 'subscriptions'];
+
+  const sel = key => tempFilters[key] || [];
+
   container.innerHTML = `
     <div class="filter-section">
       <div class="filter-section-title">Platform (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${platformsSelected.length === 0 ? 'active' : ''}" data-filter="platforms" data-value="all">All</button>
-        ${PLATFORMS.map(p => `<button class="filter-option ${platformsSelected.includes(p) ? 'active' : ''}" data-filter="platforms" data-value="${p}">${p}</button>`).join('')}
+        <button class="filter-option ${sel('platforms').length === 0 ? 'active' : ''}" data-filter="platforms" data-value="all">All</button>
+        ${PLATFORMS.map(p => `<button class="filter-option ${sel('platforms').includes(p) ? 'active' : ''}" data-filter="platforms" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
-      <div class="filter-section-title">Protection</div>
+      <div class="filter-section-title">Protection (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${tempFilters.protection === 'all' ? 'active' : ''}" data-filter="protection" data-value="all">All</button>
-        ${PROTECTION_PROVIDERS.map(p => `<button class="filter-option ${tempFilters.protection === p ? 'active' : ''}" data-filter="protection" data-value="${p}">${p}</button>`).join('')}
+        <button class="filter-option ${sel('protections').length === 0 ? 'active' : ''}" data-filter="protections" data-value="all">All</button>
+        <button class="filter-option ${sel('protections').includes('[No Protection]') ? 'active' : ''}" data-filter="protections" data-value="[No Protection]">None</button>
+        ${PROTECTION_PROVIDERS.map(p => `<button class="filter-option ${sel('protections').includes(p) ? 'active' : ''}" data-filter="protections" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
-      <div class="filter-section-title">Returns</div>
+      <div class="filter-section-title">Returns (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${tempFilters.returns === 'all' ? 'active' : ''}" data-filter="returns" data-value="all">All</button>
-        ${RETURNS_PROVIDERS.map(p => `<button class="filter-option ${tempFilters.returns === p ? 'active' : ''}" data-filter="returns" data-value="${p}">${p}</button>`).join('')}
+        <button class="filter-option ${sel('returns').length === 0 ? 'active' : ''}" data-filter="returns" data-value="all">All</button>
+        <button class="filter-option ${sel('returns').includes('[No Returns]') ? 'active' : ''}" data-filter="returns" data-value="[No Returns]">None</button>
+        ${RETURNS_PROVIDERS.map(p => `<button class="filter-option ${sel('returns').includes(p) ? 'active' : ''}" data-filter="returns" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Help Desk (select multiple)</div>
+      <div class="filter-options">
+        <button class="filter-option ${sel('helpDesks').length === 0 ? 'active' : ''}" data-filter="helpDesks" data-value="all">All</button>
+        <button class="filter-option ${sel('helpDesks').includes('[No Help Desk]') ? 'active' : ''}" data-filter="helpDesks" data-value="[No Help Desk]">None</button>
+        ${HELPDESK_OPTIONS.map(p => `<button class="filter-option ${sel('helpDesks').includes(p) ? 'active' : ''}" data-filter="helpDesks" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Subscriptions (select multiple)</div>
+      <div class="filter-options">
+        <button class="filter-option ${sel('subscriptions').length === 0 ? 'active' : ''}" data-filter="subscriptions" data-value="all">All</button>
+        <button class="filter-option ${sel('subscriptions').includes('[No Subscriptions]') ? 'active' : ''}" data-filter="subscriptions" data-value="[No Subscriptions]">None</button>
+        ${SUBSCRIPTIONS_OPTIONS.map(p => `<button class="filter-option ${sel('subscriptions').includes(p) ? 'active' : ''}" data-filter="subscriptions" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -2022,8 +2064,8 @@ function renderFilterOptions() {
     <div class="filter-section">
       <div class="filter-section-title">Status (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${(tempFilters.statuses || []).length === 0 ? 'active' : ''}" data-filter="statuses" data-value="all">All</button>
-        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${(tempFilters.statuses || []).includes(v) ? 'active' : ''}" data-filter="statuses" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
+        <button class="filter-option ${sel('statuses').length === 0 ? 'active' : ''}" data-filter="statuses" data-value="all">All</button>
+        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${sel('statuses').includes(v) ? 'active' : ''}" data-filter="statuses" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -2033,33 +2075,17 @@ function renderFilterOptions() {
       </div>
     </div>
   `;
-  
+
   container.querySelectorAll('.filter-option').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.filter;
       const value = btn.dataset.value;
-      
-      if (key === 'platforms') {
+      if (multiArrayKeys.includes(key)) {
         if (value === 'all') {
-          tempFilters.platforms = [];
+          tempFilters[key] = [];
         } else {
-          const current = tempFilters.platforms || [];
-          if (current.includes(value)) {
-            tempFilters.platforms = current.filter(p => p !== value);
-          } else {
-            tempFilters.platforms = [...current, value];
-          }
-        }
-      } else if (key === 'statuses') {
-        if (value === 'all') {
-          tempFilters.statuses = [];
-        } else {
-          const current = tempFilters.statuses || [];
-          if (current.includes(value)) {
-            tempFilters.statuses = current.filter(s => s !== value);
-          } else {
-            tempFilters.statuses = [...current, value];
-          }
+          const current = tempFilters[key] || [];
+          tempFilters[key] = current.includes(value) ? current.filter(x => x !== value) : [...current, value];
         }
       } else if (key === 'minRevenue') {
         tempFilters[key] = parseInt(value);
@@ -2071,8 +2097,8 @@ function renderFilterOptions() {
   });
 }
 
-function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])], statuses: [...(tempFilters.statuses || [])] }; saveFilters(); hideFilterModal(); renderBoothList(); }
-function clearFilters() { filters = { ...DEFAULT_FILTERS }; tempFilters = { ...filters, platforms: [], statuses: [] }; saveFilters(); hideFilterModal(); renderBoothList(); }
+function applyFilters() { filters = { ...tempFilters, platforms: [...(tempFilters.platforms || [])], statuses: [...(tempFilters.statuses || [])], protections: [...(tempFilters.protections || [])], returns: [...(tempFilters.returns || [])], helpDesks: [...(tempFilters.helpDesks || [])], subscriptions: [...(tempFilters.subscriptions || [])] }; saveFilters(); hideFilterModal(); renderBoothList(); }
+function clearFilters() { filters = { ...DEFAULT_FILTERS }; tempFilters = { ...filters, platforms: [], statuses: [], protections: [], returns: [], helpDesks: [], subscriptions: [] }; saveFilters(); hideFilterModal(); renderBoothList(); }
 
 // ============ LIST ACTIONS ============
 
@@ -2115,23 +2141,62 @@ async function clearCurrentList() {
 // ============ DASHBOARD ============
 
 async function renderDashboard() {
-  const stats = await getDashboardStats(currentShowId);
+  const [stats, allBooths] = await Promise.all([
+    getDashboardStats(currentShowId),
+    getAllBoothsForShow(currentShowId)
+  ]);
   const container = document.getElementById('dashboard-content');
-  
+
   const totals = stats.reduce((acc, s) => ({
-    demos: acc.demos + s.demos, 
+    demos: acc.demos + s.demos,
+    followUpWarm: acc.followUpWarm + s.followUpWarm,
+    followUpCold: acc.followUpCold + s.followUpCold,
     followUp: acc.followUp + s.followUp,
-    notAtShow: acc.notAtShow + s.notAtShow, 
+    notAtShow: acc.notAtShow + s.notAtShow,
     businessCards: acc.businessCards + s.businessCards
-  }), { demos: 0, followUp: 0, notAtShow: 0, businessCards: 0 });
+  }), { demos: 0, followUpWarm: 0, followUpCold: 0, followUp: 0, notAtShow: 0, businessCards: 0 });
+
+  const boothsByStatus = (statuses) => allBooths.filter(b => statuses.includes(b.status));
+  const warmBooths = boothsByStatus([STATUS.FOLLOW_UP_WARM, STATUS.FOLLOW_UP_WARM_DIRECT, STATUS.FOLLOW_UP_WARM_INTRO]);
+  const coldBooths = boothsByStatus([STATUS.FOLLOW_UP_COLD]);
+  const demoBooths = boothsByStatus([STATUS.DEMO_BOOKED]);
+  const notAtShowBooths = boothsByStatus([STATUS.NOT_AT_SHOW]);
+
+  const boothRow = (b) => {
+    const rep = stats.find(s => s.repId === b.repId);
+    const contact = b.contactName ? `<span class="dash-contact">${b.contactName}${b.contactEmail ? ` · ${b.contactEmail}` : ''}</span>` : '';
+    return `<div class="dash-lead-row">
+      <span class="dash-company">${b.companyName || 'Unknown'}</span>
+      <span class="dash-rep">${rep?.repName || ''}</span>
+      ${contact}
+      ${b.notes ? `<span class="dash-notes">${b.notes.slice(0, 80)}${b.notes.length > 80 ? '…' : ''}</span>` : ''}
+    </div>`;
+  };
+
+  const expandable = (id, rows) => rows.length === 0 ? '' : `
+    <div class="dash-leads hidden" id="dash-leads-${id}">
+      ${rows.map(boothRow).join('')}
+    </div>`;
 
   container.innerHTML = `
     <div class="dashboard-totals">
-      <div class="total-card green"><span class="total-value">${totals.demos}</span><label>Demos</label></div>
-      <div class="total-card yellow"><span class="total-value">${totals.followUp}</span><label>Follow Ups</label></div>
-      <div class="total-card"><span class="total-value">${totals.notAtShow}</span><label>Not at Show</label></div>
-      <div class="total-card blue"><span class="total-value">${totals.businessCards}</span><label>Biz Cards</label></div>
+      <div class="total-card green dash-expandable" data-target="demos">
+        <span class="total-value">${totals.demos}</span><label>Demos <i class="fas fa-chevron-down"></i></label>
+      </div>
+      <div class="total-card orange dash-expandable" data-target="warm">
+        <span class="total-value">${totals.followUpWarm}</span><label>Warm <i class="fas fa-chevron-down"></i></label>
+      </div>
+      <div class="total-card blue dash-expandable" data-target="cold">
+        <span class="total-value">${totals.followUpCold}</span><label>Cold F/U <i class="fas fa-chevron-down"></i></label>
+      </div>
+      <div class="total-card dash-expandable" data-target="noshow">
+        <span class="total-value">${totals.notAtShow}</span><label>Not at Show <i class="fas fa-chevron-down"></i></label>
+      </div>
     </div>
+    ${expandable('demos', demoBooths)}
+    ${expandable('warm', warmBooths)}
+    ${expandable('cold', coldBooths)}
+    ${expandable('noshow', notAtShowBooths)}
     <div class="section-title" style="padding:16px 16px 8px">Rep Rankings</div>
     <div class="leaderboard">
       ${stats.map((s, i) => `
@@ -2154,6 +2219,15 @@ async function renderDashboard() {
       `).join('')}
     </div>
   `;
+
+  container.querySelectorAll('.dash-expandable').forEach(card => {
+    card.addEventListener('click', () => {
+      const panel = document.getElementById(`dash-leads-${card.dataset.target}`);
+      if (!panel) return;
+      panel.classList.toggle('hidden');
+      card.querySelector('i').className = panel.classList.contains('hidden') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+    });
+  });
 }
 
 async function exportDashboard() {
