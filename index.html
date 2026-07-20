@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260720"></head>
+  <link rel="stylesheet" href="styles.css?v=20260720b"></head>
 <body>
   <div id="app">
     <!-- Show Selection View -->
@@ -154,6 +154,27 @@
       </div>
     </div>
 
+    <!-- Email Draft Modal -->
+    <div id="email-draft-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Draft Email</h2>
+          <button class="icon-btn" id="close-email-draft-btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="email-draft-subject-row">
+            <label>Subject</label>
+            <div id="email-draft-subject" class="email-draft-subject"></div>
+          </div>
+          <div id="email-draft-body" class="email-draft-body"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn secondary" id="copy-email-btn"><i class="fas fa-copy"></i> Copy</button>
+          <button class="btn primary" id="mailto-email-btn"><i class="fas fa-envelope"></i> Open in Mail</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Camera Modal -->
     <div id="camera-modal" class="modal hidden">
       <div class="camera-container">
@@ -169,8 +190,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260720"></script>
-  <script src="db.js?v=20260720"></script>
-  <script src="app.js?v=20260720"></script>
+  <script src="config.js?v=20260720b"></script>
+  <script src="db.js?v=20260720b"></script>
+  <script src="app.js?v=20260720b"></script>
 </body>
 </html>

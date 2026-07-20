@@ -368,6 +368,7 @@ function setupEventListeners() {
   
   // Camera modal
   document.getElementById('close-camera-btn').addEventListener('click', closeCameraModal);
+  document.getElementById('close-email-draft-btn').addEventListener('click', hideEmailDraftModal);
   document.getElementById('capture-btn').addEventListener('click', capturePhoto);
   
   // Search
@@ -1224,6 +1225,11 @@ async function showDetailView(id) {
       <button class="submit-btn webhook hubspot-note" id="submit-note-btn" style="margin-top: 8px; width: 100%;"><i class="fab fa-hubspot"></i> Create HubSpot Note</button>
     </div>
 
+    <div class="section">
+      <div class="section-title">Outreach</div>
+      <button class="btn secondary full" id="draft-email-btn"><i class="fas fa-magic"></i> Draft Follow-Up Email</button>
+    </div>
+
     ${getAlignedSection()}
     
     ${getCalendarSection()}
@@ -1343,6 +1349,7 @@ async function showDetailView(id) {
   document.getElementById('submit-followup-btn')?.addEventListener('click', () => showSubmitModal('followup'));
   document.getElementById('submit-demo-btn')?.addEventListener('click', () => showSubmitModal('demo'));
   document.getElementById('submit-note-btn')?.addEventListener('click', () => showSubmitModal('ocr_note'));
+  document.getElementById('draft-email-btn')?.addEventListener('click', () => draftEmail(currentBoothId));
   
   // File upload listeners
   document.getElementById('upload-files-btn')?.addEventListener('click', () => {
@@ -1426,6 +1433,8 @@ const WEBHOOK_URLS = {
 
 // OCR Edge Function URL
 const OCR_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/hyper-processor`;
+const DRAFT_EMAIL_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/draft-email`;
+let dashboardBooths = [];
 
 // OCR Business Card using Supabase Edge Function
 async function scanBusinessCard() {
@@ -2148,6 +2157,7 @@ async function renderDashboard() {
     getDashboardStats(currentShowId),
     getAllBoothsForShow(currentShowId)
   ]);
+  dashboardBooths = allBooths;
   const container = document.getElementById('dashboard-content');
 
   const totals = stats.reduce((acc, s) => ({
@@ -2168,9 +2178,10 @@ async function renderDashboard() {
   const boothRow = (b) => {
     const rep = stats.find(s => s.repId === b.repId);
     const contact = b.contactName ? `<span class="dash-contact">${b.contactName}${b.contactEmail ? ` · ${b.contactEmail}` : ''}</span>` : '';
-    return `<div class="dash-lead-row">
+    return `<div class="dash-lead-row" data-booth-id="${b.id}">
       <span class="dash-company">${b.companyName || 'Unknown'}</span>
       <span class="dash-rep">${rep?.repName || ''}</span>
+      ${b.contactEmail ? `<span class="dash-hs-status" data-email="${b.contactEmail}"></span>` : ''}
       ${contact}
       ${b.notes ? `<span class="dash-notes">${b.notes.slice(0, 80)}${b.notes.length > 80 ? '…' : ''}</span>` : ''}
     </div>`;
@@ -2182,6 +2193,9 @@ async function renderDashboard() {
     </div>`;
 
   container.innerHTML = `
+    <div class="dashboard-actions">
+      <button class="btn secondary small dash-hs-sync-btn" id="sync-hs-btn"><i class="fab fa-hubspot"></i> Check HubSpot</button>
+    </div>
     <div class="dashboard-totals">
       <div class="total-card green dash-expandable" data-target="demos">
         <span class="total-value">${totals.demos}</span><label>Demos <i class="fas fa-chevron-down"></i></label>
@@ -2231,6 +2245,156 @@ async function renderDashboard() {
       card.querySelector('i').className = panel.classList.contains('hidden') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
     });
   });
+
+  document.getElementById('sync-hs-btn')?.addEventListener('click', syncHubSpot);
+}
+
+async function syncHubSpot() {
+  const token = localStorage.getItem('tst_hs_private_token');
+  if (!token) {
+    alert('Add your HubSpot Private App Token in Admin → Integrations first.');
+    return;
+  }
+
+  const btn = document.getElementById('sync-hs-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+
+  const statusEls = document.querySelectorAll('.dash-hs-status[data-email]');
+  statusEls.forEach(el => { el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:10px;color:var(--text-muted)"></i>'; });
+
+  // Open all panels so rows are visible
+  document.querySelectorAll('.dash-leads').forEach(p => {
+    p.classList.remove('hidden');
+    const card = document.querySelector(`[data-target="${p.id.replace('dash-leads-', '')}"]`);
+    if (card) card.querySelector('i').className = 'fas fa-chevron-up';
+  });
+
+  const checkEmail = async (email) => {
+    try {
+      const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }], limit: 1 })
+      });
+      const data = await res.json();
+      return data.total > 0 ? { found: true, id: data.results[0]?.id } : { found: false };
+    } catch {
+      return { found: null };
+    }
+  };
+
+  const createContact = async (el) => {
+    const row = el.closest('.dash-lead-row');
+    const boothId = row?.dataset.boothId;
+    const booth = dashboardBooths.find(b => b.id === boothId);
+    if (!booth) return;
+
+    const nameParts = (booth.contactName || '').trim().split(' ');
+    const props = {
+      email: booth.contactEmail,
+      firstname: nameParts[0] || '',
+      lastname: nameParts.slice(1).join(' ') || '',
+      company: booth.companyName || '',
+      jobtitle: booth.contactTitle || '',
+      phone: booth.contactPhone || ''
+    };
+
+    el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i>';
+    try {
+      const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ properties: props })
+      });
+      const data = await res.json();
+      if (data.id) {
+        const url = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/contact/${data.id}`;
+        el.innerHTML = `<a href="${url}" target="_blank" class="hs-badge found"><i class="fab fa-hubspot"></i> Created</a>`;
+      } else {
+        el.innerHTML = `<span class="hs-badge missing" title="${JSON.stringify(data.message || '')}"><i class="fas fa-times"></i> Error</span>`;
+      }
+    } catch {
+      el.innerHTML = `<span class="hs-badge missing"><i class="fas fa-times"></i> Error</span>`;
+    }
+  };
+
+  await Promise.all(Array.from(statusEls).map(async (el) => {
+    const email = el.dataset.email;
+    const result = await checkEmail(email);
+    if (result.found === true) {
+      const url = result.id ? `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/contact/${result.id}` : '#';
+      el.innerHTML = `<a href="${url}" target="_blank" class="hs-badge found"><i class="fab fa-hubspot"></i> In HubSpot</a>`;
+    } else if (result.found === false) {
+      el.innerHTML = `<span class="hs-badge missing"><i class="fas fa-times-circle"></i> Not in HubSpot <button class="hs-create-btn">Create</button></span>`;
+      el.querySelector('.hs-create-btn').addEventListener('click', (e) => { e.preventDefault(); createContact(el); });
+    } else {
+      el.innerHTML = `<span class="hs-badge missing"><i class="fas fa-exclamation-triangle"></i> Error</span>`;
+    }
+  }));
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fab fa-hubspot"></i> Check HubSpot';
+}
+
+async function draftEmail(boothId) {
+  const booth = booths.find(b => b.id === boothId);
+  if (!booth) return;
+
+  const btn = document.getElementById('draft-email-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Drafting...';
+
+  try {
+    const res = await fetch(DRAFT_EMAIL_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        companyName: booth.companyName,
+        contactName: booth.contactName,
+        contactTitle: booth.contactTitle,
+        platform: booth.platform,
+        status: booth.status,
+        protection: booth.protection,
+        returns: booth.returns,
+        helpDesk: booth.helpDesk,
+        subscriptions: booth.subscriptions,
+        notes: booth.notes,
+        estimatedMonthlySales: booth.estimatedMonthlySales
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    showEmailDraftModal(data.subject || '', data.body || data.email || '');
+  } catch (err) {
+    alert(`Could not draft email: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-magic"></i> Draft Follow-Up Email';
+  }
+}
+
+function showEmailDraftModal(subject, body) {
+  document.getElementById('email-draft-subject').textContent = subject;
+  document.getElementById('email-draft-body').textContent = body;
+  document.getElementById('email-draft-modal').classList.remove('hidden');
+
+  document.getElementById('copy-email-btn').onclick = () => {
+    navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).then(() => {
+      const btn = document.getElementById('copy-email-btn');
+      btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+    });
+  };
+
+  document.getElementById('mailto-email-btn').onclick = () => {
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+  };
+}
+
+function hideEmailDraftModal() {
+  document.getElementById('email-draft-modal').classList.add('hidden');
 }
 
 async function exportDashboard() {
@@ -2264,6 +2428,7 @@ function renderAdminTabs() {
     <button class="admin-tab ${!showSelected ? 'active' : ''}" data-tab="shows">All Shows</button>
     <button class="admin-tab" data-tab="reps">Reps</button>
     <button class="admin-tab" data-tab="import">Import</button>
+    <button class="admin-tab" data-tab="integrations">Integrations</button>
   `;
   container.querySelectorAll('.admin-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2464,6 +2629,27 @@ function showAdminTab(tab) {
     document.getElementById('import-file').addEventListener('change', importFromFile);
     document.getElementById('import-paste-btn').addEventListener('click', importFromPaste);
     document.getElementById('generate-hubspot-urls-btn').addEventListener('click', generateHubSpotUrls);
+  } else if (tab === 'integrations') {
+    const savedToken = localStorage.getItem('tst_hs_private_token') || '';
+    content.innerHTML = `
+      <div class="admin-section">
+        <h4 style="margin-bottom: 12px;">HubSpot</h4>
+        <div class="form-group">
+          <label>Private App Token</label>
+          <input type="password" class="input" id="hs-token-input" value="${savedToken}" placeholder="pat-na1-...">
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Used to check and create contacts from the dashboard. Create one in HubSpot → Settings → Integrations → Private Apps.</p>
+        </div>
+        <button class="btn primary" id="save-hs-token-btn" style="margin-top: 8px;"><i class="fas fa-save"></i> Save Token</button>
+        ${savedToken ? '<span style="margin-left: 12px; color: var(--green); font-size: 13px;"><i class="fas fa-check-circle"></i> Token saved</span>' : ''}
+      </div>
+    `;
+    document.getElementById('save-hs-token-btn').addEventListener('click', () => {
+      const val = document.getElementById('hs-token-input').value.trim();
+      localStorage.setItem('tst_hs_private_token', val);
+      const btn = document.getElementById('save-hs-token-btn');
+      btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+      setTimeout(() => { btn.innerHTML = '<i class="fas fa-save"></i> Save Token'; }, 2000);
+    });
   }
 }
 

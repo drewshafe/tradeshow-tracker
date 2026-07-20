@@ -699,3 +699,19 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .btn-icon:hover {
   opacity: 0.8;
 }
+
+/* ── HubSpot Sync ── */
+.dashboard-actions { padding: 12px 16px 0; display: flex; gap: 8px; }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+.dash-hs-status { display: inline-flex; align-items: center; }
+.hs-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 6px; border-radius: 10px; white-space: nowrap; text-decoration: none; }
+.hs-badge.found { background: rgba(0,184,148,0.15); color: #00b894; }
+.hs-badge.missing { background: rgba(214,48,49,0.12); color: var(--red); }
+.hs-create-btn { background: none; border: 1px solid currentColor; border-radius: 8px; color: var(--red); font-size: 10px; padding: 1px 5px; cursor: pointer; margin-left: 4px; }
+.hs-create-btn:hover { background: rgba(214,48,49,0.15); }
+
+/* ── Email Draft Modal ── */
+.email-draft-subject-row { background: var(--bg-secondary); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.email-draft-subject-row label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.email-draft-subject { font-weight: 600; color: var(--text-primary); font-size: 15px; }
+.email-draft-body { white-space: pre-wrap; font-size: 14px; line-height: 1.65; color: var(--text-primary); background: var(--bg-secondary); border-radius: 8px; padding: 14px; min-height: 220px; max-height: 55vh; overflow-y: auto; }
