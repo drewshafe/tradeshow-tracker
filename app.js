@@ -1434,6 +1434,7 @@ const WEBHOOK_URLS = {
 // OCR Edge Function URL
 const OCR_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/hyper-processor`;
 const DRAFT_EMAIL_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/draft-email`;
+const HUBSPOT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/hubspot`;
 let dashboardBooths = [];
 
 // OCR Business Card using Supabase Edge Function
@@ -2250,12 +2251,6 @@ async function renderDashboard() {
 }
 
 async function syncHubSpot() {
-  const token = localStorage.getItem('tst_hs_private_token');
-  if (!token) {
-    alert('Add your HubSpot Private App Token in Admin → Integrations first.');
-    return;
-  }
-
   const btn = document.getElementById('sync-hs-btn');
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
@@ -2263,22 +2258,25 @@ async function syncHubSpot() {
   const statusEls = document.querySelectorAll('.dash-hs-status[data-email]');
   statusEls.forEach(el => { el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:10px;color:var(--text-muted)"></i>'; });
 
-  // Open all panels so rows are visible
   document.querySelectorAll('.dash-leads').forEach(p => {
     p.classList.remove('hidden');
     const card = document.querySelector(`[data-target="${p.id.replace('dash-leads-', '')}"]`);
     if (card) card.querySelector('i').className = 'fas fa-chevron-up';
   });
 
+  const hsCall = async (body) => {
+    const res = await fetch(HUBSPOT_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(body)
+    });
+    return res.json();
+  };
+
   const checkEmail = async (email) => {
     try {
-      const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }], limit: 1 })
-      });
-      const data = await res.json();
-      return data.total > 0 ? { found: true, id: data.results[0]?.id } : { found: false };
+      const data = await hsCall({ action: 'search', email });
+      return { found: data.found, id: data.id };
     } catch {
       return { found: null };
     }
@@ -2286,33 +2284,25 @@ async function syncHubSpot() {
 
   const createContact = async (el) => {
     const row = el.closest('.dash-lead-row');
-    const boothId = row?.dataset.boothId;
-    const booth = dashboardBooths.find(b => b.id === boothId);
+    const booth = dashboardBooths.find(b => b.id === row?.dataset.boothId);
     if (!booth) return;
 
     const nameParts = (booth.contactName || '').trim().split(' ');
-    const props = {
-      email: booth.contactEmail,
-      firstname: nameParts[0] || '',
-      lastname: nameParts.slice(1).join(' ') || '',
-      company: booth.companyName || '',
-      jobtitle: booth.contactTitle || '',
-      phone: booth.contactPhone || ''
-    };
-
     el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:10px"></i>';
     try {
-      const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ properties: props })
-      });
-      const data = await res.json();
+      const data = await hsCall({ action: 'create', properties: {
+        email: booth.contactEmail,
+        firstname: nameParts[0] || '',
+        lastname: nameParts.slice(1).join(' ') || '',
+        company: booth.companyName || '',
+        jobtitle: booth.contactTitle || '',
+        phone: booth.contactPhone || ''
+      }});
       if (data.id) {
         const url = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/contact/${data.id}`;
         el.innerHTML = `<a href="${url}" target="_blank" class="hs-badge found"><i class="fab fa-hubspot"></i> Created</a>`;
       } else {
-        el.innerHTML = `<span class="hs-badge missing" title="${JSON.stringify(data.message || '')}"><i class="fas fa-times"></i> Error</span>`;
+        el.innerHTML = `<span class="hs-badge missing" title="${data.error || ''}"><i class="fas fa-times"></i> Error</span>`;
       }
     } catch {
       el.innerHTML = `<span class="hs-badge missing"><i class="fas fa-times"></i> Error</span>`;
@@ -2630,25 +2620,36 @@ function showAdminTab(tab) {
     document.getElementById('import-paste-btn').addEventListener('click', importFromPaste);
     document.getElementById('generate-hubspot-urls-btn').addEventListener('click', generateHubSpotUrls);
   } else if (tab === 'integrations') {
-    const savedToken = localStorage.getItem('tst_hs_private_token') || '';
     content.innerHTML = `
       <div class="admin-section">
-        <h4 style="margin-bottom: 12px;">HubSpot</h4>
-        <div class="form-group">
-          <label>Private App Token</label>
-          <input type="password" class="input" id="hs-token-input" value="${savedToken}" placeholder="pat-na1-...">
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Used to check and create contacts from the dashboard. Create one in HubSpot → Settings → Integrations → Private Apps.</p>
-        </div>
-        <button class="btn primary" id="save-hs-token-btn" style="margin-top: 8px;"><i class="fas fa-save"></i> Save Token</button>
-        ${savedToken ? '<span style="margin-left: 12px; color: var(--green); font-size: 13px;"><i class="fas fa-check-circle"></i> Token saved</span>' : ''}
+        <h4 style="margin-bottom: 8px;">HubSpot</h4>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Token is managed server-side in Supabase — no per-device setup needed.</p>
+        <button class="btn secondary" id="test-hs-btn"><i class="fab fa-hubspot"></i> Test Connection</button>
+        <div id="hs-test-result" style="margin-top: 10px; font-size: 13px;"></div>
       </div>
     `;
-    document.getElementById('save-hs-token-btn').addEventListener('click', () => {
-      const val = document.getElementById('hs-token-input').value.trim();
-      localStorage.setItem('tst_hs_private_token', val);
-      const btn = document.getElementById('save-hs-token-btn');
-      btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
-      setTimeout(() => { btn.innerHTML = '<i class="fas fa-save"></i> Save Token'; }, 2000);
+    document.getElementById('test-hs-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('test-hs-btn');
+      const result = document.getElementById('hs-test-result');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+      try {
+        const res = await fetch(HUBSPOT_FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ action: 'search', email: 'test@test.com' })
+        });
+        const data = await res.json();
+        if (data.error && data.error.includes('HUBSPOT_TOKEN')) {
+          result.innerHTML = '<span style="color:var(--red)"><i class="fas fa-times-circle"></i> Token not configured in Supabase</span>';
+        } else {
+          result.innerHTML = '<span style="color:var(--green)"><i class="fas fa-check-circle"></i> Connected</span>';
+        }
+      } catch {
+        result.innerHTML = '<span style="color:var(--red)"><i class="fas fa-times-circle"></i> Could not reach server</span>';
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fab fa-hubspot"></i> Test Connection';
     });
   }
 }
