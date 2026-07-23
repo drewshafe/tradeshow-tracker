@@ -471,7 +471,7 @@ function hideAllViews() {
 }
 
 const REP_HIT_LIST_LOGOS = {
-  jason: 'JK_hitlistlogo.png',
+  jason: 'jk_hitlistlogo.png',
   drew:  'DS_hitlistlogo.png',
   wyatt: 'WB_hitlistlogo.png',
 };
