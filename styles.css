@@ -717,6 +717,7 @@ textarea.input { min-height: 120px; resize: vertical; font-family: inherit; }
 .email-draft-body { white-space: pre-wrap; font-size: 14px; line-height: 1.65; color: var(--text-primary); background: var(--bg-secondary); border-radius: 8px; padding: 14px; min-height: 220px; max-height: 55vh; overflow-y: auto; }
 .header-logo { height: 34px; width: auto; object-fit: contain; display: block; }
 .modal-logo { height: 38px; width: auto; object-fit: contain; display: block; }
+.hitlist-logo { height: 34px; width: auto; object-fit: contain; display: block; max-width: 260px; }
 .crm-bot-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .crm-bot-avatar { display: flex; align-items: center; flex-shrink: 0; }
 .crm-bot-img { height: 52px; width: auto; object-fit: contain; }

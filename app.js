@@ -470,12 +470,22 @@ function hideAllViews() {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 }
 
+const REP_HIT_LIST_LOGOS = {
+  jason: 'JK_hitlistlogo.png',
+  drew:  'DS_hitlistlogo.png',
+  wyatt: 'WB_hitlistlogo.png',
+};
+
 function updateListTitle() {
   const rep = reps.find(r => r.id === currentRepId);
   const listLabel = LIST_LABELS[currentListType] || currentListType;
-  document.getElementById('list-title').textContent = currentRepId 
-    ? `${rep?.name || 'Rep'} - ${listLabel}`
-    : listLabel;
+  const titleEl = document.getElementById('list-title');
+  const logo = currentRepId && REP_HIT_LIST_LOGOS[currentRepId];
+  if (logo) {
+    titleEl.innerHTML = `<img src="${logo}" class="hitlist-logo" alt="${rep?.name || ''} Hit List">`;
+  } else {
+    titleEl.textContent = currentRepId ? `${rep?.name || 'Rep'} - ${listLabel}` : listLabel;
+  }
 }
 
 // ============ SHOW LIST ============
