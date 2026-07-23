@@ -1183,8 +1183,11 @@ async function showDetailView(id) {
     <div class="section">
       <div class="section-title" id="contact-section-title">
         Contact Info
-        ${booth.recordId ? '<span class="crm-badge"><i class="fab fa-hubspot"></i> In CRM</span>' : ''}
         ${booth.contactName || booth.contactEmail ? '<span class="ocr-badge"><i class="fas fa-magic"></i> OCR</span>' : ''}
+      </div>
+      <div class="crm-bot-row" id="crm-bot-row">
+        <span class="crm-bot-avatar"><i class="fas fa-robot"></i> CRM Bot</span>
+        <span class="crm-bot-badge loading" id="crm-bot-badge"><i class="fas fa-spinner fa-spin"></i></span>
       </div>
       <input type="text" class="input" id="contact-name" placeholder="Contact name..." value="${booth.contactName || ''}">
       <input type="text" class="input" id="contact-title" placeholder="Title (e.g., Director of E-commerce)..." value="${booth.contactTitle || ''}" style="margin-top: 8px;">
@@ -1350,6 +1353,7 @@ async function showDetailView(id) {
   document.getElementById('submit-demo-btn')?.addEventListener('click', () => showSubmitModal('demo'));
   document.getElementById('submit-note-btn')?.addEventListener('click', () => showSubmitModal('ocr_note'));
   document.getElementById('draft-email-btn')?.addEventListener('click', () => draftEmail(currentBoothId));
+  checkCrmBotStatus(booth);
   
   // File upload listeners
   document.getElementById('upload-files-btn')?.addEventListener('click', () => {
@@ -2028,12 +2032,26 @@ function renderFilterOptions() {
 
   const sel = key => tempFilters[key] || [];
 
+  const statusOrder = [STATUS.NOT_VISITED, STATUS.COME_BACK, STATUS.FOLLOW_UP_WARM, STATUS.FOLLOW_UP_WARM_DIRECT, STATUS.FOLLOW_UP_WARM_INTRO, STATUS.FOLLOW_UP_COLD, STATUS.DEMO_BOOKED, STATUS.NOT_INTERESTED, STATUS.DQ, STATUS.NOT_AT_SHOW];
+
   container.innerHTML = `
     <div class="filter-section">
-      <div class="filter-section-title">Platform (select multiple)</div>
+      <div class="filter-section-title">Status (select multiple)</div>
       <div class="filter-options">
-        <button class="filter-option ${sel('platforms').length === 0 ? 'active' : ''}" data-filter="platforms" data-value="all">All</button>
-        ${PLATFORMS.map(p => `<button class="filter-option ${sel('platforms').includes(p) ? 'active' : ''}" data-filter="platforms" data-value="${p}">${p}</button>`).join('')}
+        <button class="filter-option ${sel('statuses').length === 0 ? 'active' : ''}" data-filter="statuses" data-value="all">All</button>
+        ${statusOrder.map(v => `<button class="filter-option ${sel('statuses').includes(v) ? 'active' : ''}" data-filter="statuses" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Min Revenue</div>
+      <div class="filter-options">
+        ${REVENUE_THRESHOLDS.map(t => `<button class="filter-option ${tempFilters.minRevenue === t ? 'active' : ''}" data-filter="minRevenue" data-value="${t}">${t === 0 ? 'Any' : '≥ ' + formatCurrency(t)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-section-title">Hall / Level</div>
+      <div class="filter-options">
+        ${getHallOptionsForCurrentShow().map(h => `<button class="filter-option ${tempFilters.hall === h.value ? 'active' : ''}" data-filter="hall" data-value="${h.value}">${h.label}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -2041,15 +2059,7 @@ function renderFilterOptions() {
       <div class="filter-options">
         <button class="filter-option ${sel('protections').length === 0 ? 'active' : ''}" data-filter="protections" data-value="all">All</button>
         <button class="filter-option ${sel('protections').includes('[No Protection]') ? 'active' : ''}" data-filter="protections" data-value="[No Protection]">None</button>
-        ${PROTECTION_PROVIDERS.map(p => `<button class="filter-option ${sel('protections').includes(p) ? 'active' : ''}" data-filter="protections" data-value="${p}">${p}</button>`).join('')}
-      </div>
-    </div>
-    <div class="filter-section">
-      <div class="filter-section-title">Returns (select multiple)</div>
-      <div class="filter-options">
-        <button class="filter-option ${sel('returns').length === 0 ? 'active' : ''}" data-filter="returns" data-value="all">All</button>
-        <button class="filter-option ${sel('returns').includes('[No Returns]') ? 'active' : ''}" data-filter="returns" data-value="[No Returns]">None</button>
-        ${RETURNS_PROVIDERS.map(p => `<button class="filter-option ${sel('returns').includes(p) ? 'active' : ''}" data-filter="returns" data-value="${p}">${p}</button>`).join('')}
+        ${PROTECTION_PROVIDERS.filter(p => p !== '[No Protection]').map(p => `<button class="filter-option ${sel('protections').includes(p) ? 'active' : ''}" data-filter="protections" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
     <div class="filter-section">
@@ -2061,6 +2071,14 @@ function renderFilterOptions() {
       </div>
     </div>
     <div class="filter-section">
+      <div class="filter-section-title">Returns (select multiple)</div>
+      <div class="filter-options">
+        <button class="filter-option ${sel('returns').length === 0 ? 'active' : ''}" data-filter="returns" data-value="all">All</button>
+        <button class="filter-option ${sel('returns').includes('[No Returns]') ? 'active' : ''}" data-filter="returns" data-value="[No Returns]">None</button>
+        ${RETURNS_PROVIDERS.filter(p => p !== '[No Returns]').map(p => `<button class="filter-option ${sel('returns').includes(p) ? 'active' : ''}" data-filter="returns" data-value="${p}">${p}</button>`).join('')}
+      </div>
+    </div>
+    <div class="filter-section">
       <div class="filter-section-title">Subscriptions (select multiple)</div>
       <div class="filter-options">
         <button class="filter-option ${sel('subscriptions').length === 0 ? 'active' : ''}" data-filter="subscriptions" data-value="all">All</button>
@@ -2069,22 +2087,11 @@ function renderFilterOptions() {
       </div>
     </div>
     <div class="filter-section">
-      <div class="filter-section-title">Min Revenue</div>
+      <div class="filter-section-title">Platform (select multiple)</div>
       <div class="filter-options">
-        ${REVENUE_THRESHOLDS.map(t => `<button class="filter-option ${tempFilters.minRevenue === t ? 'active' : ''}" data-filter="minRevenue" data-value="${t}">${t === 0 ? 'Any' : '≥ ' + formatCurrency(t)}</button>`).join('')}
-      </div>
-    </div>
-    <div class="filter-section">
-      <div class="filter-section-title">Status (select multiple)</div>
-      <div class="filter-options">
-        <button class="filter-option ${sel('statuses').length === 0 ? 'active' : ''}" data-filter="statuses" data-value="all">All</button>
-        ${Object.entries(STATUS).map(([k, v]) => `<button class="filter-option ${sel('statuses').includes(v) ? 'active' : ''}" data-filter="statuses" data-value="${v}">${STATUS_LABELS[v]}</button>`).join('')}
-      </div>
-    </div>
-    <div class="filter-section">
-      <div class="filter-section-title">Hall / Level</div>
-      <div class="filter-options">
-        ${getHallOptionsForCurrentShow().map(h => `<button class="filter-option ${tempFilters.hall === h.value ? 'active' : ''}" data-filter="hall" data-value="${h.value}">${h.label}</button>`).join('')}
+        <button class="filter-option ${sel('platforms').length === 0 ? 'active' : ''}" data-filter="platforms" data-value="all">All</button>
+        <button class="filter-option ${sel('platforms').includes('[No Platform]') ? 'active' : ''}" data-filter="platforms" data-value="[No Platform]">None</button>
+        ${PLATFORMS.filter(p => p !== '[No Platform]').map(p => `<button class="filter-option ${sel('platforms').includes(p) ? 'active' : ''}" data-filter="platforms" data-value="${p}">${p}</button>`).join('')}
       </div>
     </div>
   `;
@@ -2325,6 +2332,37 @@ async function syncHubSpot() {
 
   btn.disabled = false;
   btn.innerHTML = '<i class="fab fa-hubspot"></i> Check HubSpot';
+}
+
+async function checkCrmBotStatus(booth) {
+  const badge = document.getElementById('crm-bot-badge');
+  if (!badge) return;
+
+  if (!booth.contactEmail) {
+    badge.className = 'crm-bot-badge missing';
+    badge.innerHTML = '<i class="fas fa-times-circle"></i> Not in HubSpot';
+    return;
+  }
+
+  try {
+    const res = await fetch(HUBSPOT_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ action: 'search', email: booth.contactEmail })
+    });
+    const data = await res.json();
+    if (data.found) {
+      const url = data.id ? `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/contact/${data.id}` : '#';
+      badge.className = 'crm-bot-badge found';
+      badge.innerHTML = `<a href="${url}" target="_blank"><i class="fab fa-hubspot"></i> In HubSpot</a>`;
+    } else {
+      badge.className = 'crm-bot-badge missing';
+      badge.innerHTML = '<i class="fas fa-times-circle"></i> Not in HubSpot';
+    }
+  } catch {
+    badge.className = 'crm-bot-badge missing';
+    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> No Contact Data';
+  }
 }
 
 async function draftEmail(boothId) {
