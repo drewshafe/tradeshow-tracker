@@ -1186,7 +1186,7 @@ async function showDetailView(id) {
         ${booth.contactName || booth.contactEmail ? '<span class="ocr-badge"><i class="fas fa-magic"></i> OCR</span>' : ''}
       </div>
       <div class="crm-bot-row" id="crm-bot-row">
-        <span class="crm-bot-avatar"><i class="fas fa-robot"></i> CRM Bot</span>
+        <span class="crm-bot-avatar"><img src="TST_crmbot.png" class="crm-bot-img" alt="CRM Bot"></span>
         <span class="crm-bot-badge loading" id="crm-bot-badge"><i class="fas fa-spinner fa-spin"></i></span>
       </div>
       <input type="text" class="input" id="contact-name" placeholder="Contact name..." value="${booth.contactName || ''}">
