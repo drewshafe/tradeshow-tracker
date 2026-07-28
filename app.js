@@ -492,14 +492,14 @@ function updateListTitle() {
 
 function renderShowList() {
   const container = document.getElementById('show-list');
-  
+
   if (shows.length === 0) {
     container.innerHTML = '<div class="empty-state"><i class="fas fa-calendar-alt"></i><p>No shows configured</p><button class="btn primary" id="add-show-empty-btn">Add Show</button></div>';
-    document.getElementById('add-show-empty-btn')?.addEventListener('click', showAdminModal);
+    document.getElementById('add-show-empty-btn')?.addEventListener('click', addShowPrompt);
     return;
   }
-  
-  container.innerHTML = shows.map(show => {
+
+  container.innerHTML = `<div class="show-list-header"><button class="btn primary" id="add-show-top-btn"><i class="fas fa-plus"></i> Add Show</button></div>` + shows.map(show => {
     const startDate = show.startDate ? new Date(show.startDate) : null;
     const endDate = show.endDate ? new Date(show.endDate) : null;
     const dateStr = startDate && endDate 
@@ -517,7 +517,7 @@ function renderShowList() {
     `;
   }).join('');
   
-  // Attach click handlers
+  document.getElementById('add-show-top-btn')?.addEventListener('click', addShowPrompt);
   container.querySelectorAll('.show-card').forEach(card => {
     card.addEventListener('click', () => selectShow(card.dataset.showId));
   });
@@ -2706,10 +2706,14 @@ async function addShowPrompt() {
   const name = prompt('Show name:'); if (!name) return;
   const location = prompt('Location:') || '';
   const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-  await saveShow({ id, name, location, startDate: '', endDate: '', website: '', exhibitorList: '' });
-  shows = await getShows();
-  showAdminTab('shows');
-  renderShowList();
+  try {
+    await saveShow({ id, name, location, startDate: null, endDate: null, website: '', exhibitorList: '' });
+    shows = await getShows();
+    renderShowList();
+    showAdminTab('shows');
+  } catch (e) {
+    alert('Error saving show: ' + (e.message || e));
+  }
 }
 
 async function addRepPrompt() {
