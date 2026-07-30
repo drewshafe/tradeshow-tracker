@@ -99,10 +99,22 @@ serve(async (req) => {
         text = `${payload.campaign || showName} Follow Up Submission by ${payload.repName}\n\nContact: ${payload.contactName}\nCompany: ${payload.companyName}\nBusiness Card Submitted: ${hasCard}\nMonthly store orders: ${orders}\nAOV: ${aov}\nNotes: ${notes}\n—${hsLink}`;
       }
 
-      const slackBody: Record<string, unknown> = { username, text, icon_emoji: ':bar_chart:' };
+      const TRACKER_URL = 'https://drewshafe.github.io/tradeshow-tracker/';
+      const LOGO_URL    = 'https://drewshafe.github.io/tradeshow-tracker/TST_showsheets.png';
+      const trackerLink = `\n<${TRACKER_URL}|Open Show Sheets>`;
+      const fullText    = text + trackerLink;
+
+      const attachments: Record<string, unknown>[] = [];
       if (payload.businessCardUrl) {
-        slackBody.attachments = [{ image_url: payload.businessCardUrl, fallback: 'Business Card' }];
+        attachments.push({ image_url: payload.businessCardUrl, fallback: 'Business Card' });
       }
+
+      const slackBody: Record<string, unknown> = {
+        username,
+        text: fullText,
+        icon_url: LOGO_URL,
+        attachments,
+      };
 
       await fetch(slackWebhook, {
         method: 'POST',
