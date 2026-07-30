@@ -1396,25 +1396,23 @@ const HS_SYNC_STATUSES = new Set([
   STATUS.DEMO_BOOKED,
 ]);
 
-async function setStatus(status) {
+async function setStatus(status, skipHsSync = false) {
   const booth = booths.find(b => b.id === currentBoothId);
   if (booth) {
-    const prevStatus = booth.status;
     booth.status = status;
     await saveBooth(booth);
     showDetailView(currentBoothId);
     renderBoothList();
 
-    if (HS_SYNC_STATUSES.has(status)) {
+    // Silent background contact sync — skipped when called from submit modal
+    if (!skipHsSync && HS_SYNC_STATUSES.has(status)) {
       const show = shows.find(s => s.id === currentShowId);
-      // Only send Slack notification on first transition into this category
-      const notifySlack = !HS_SYNC_STATUSES.has(prevStatus);
-      syncToHubSpot(booth, show, status === STATUS.DEMO_BOOKED, notifySlack);
+      syncToHubSpot(booth, show, status === STATUS.DEMO_BOOKED);
     }
   }
 }
 
-async function syncToHubSpot(booth, show, isDemoBooked, notifySlack) {
+async function syncToHubSpot(booth, show, isDemoBooked) {
   try {
     const res = await fetch(HUBSPOT_FUNCTION_URL, {
       method: 'POST',
@@ -1424,7 +1422,6 @@ async function syncToHubSpot(booth, show, isDemoBooked, notifySlack) {
         booth,
         showName: show?.name || '',
         isDemoBooked,
-        notifySlack,
       }),
     });
     const data = await res.json();
@@ -1775,46 +1772,50 @@ function showSubmitModal(type) {
     try {
       modal.querySelector('#submit-webhook-btn').disabled = true;
       modal.querySelector('#submit-webhook-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-      
-      // Create a hidden iframe to submit to (avoids CORS)
-      const iframe = document.createElement('iframe');
-      iframe.name = 'zapier-submit-frame';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      
-      // Create a form to submit
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = webhookUrl;
-      form.target = 'zapier-submit-frame';
-      
-      // Add all payload fields as hidden inputs
-      Object.entries(payload).forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-      });
-      
-      document.body.appendChild(form);
-      form.submit();
-      
-      // Clean up after a moment
-      setTimeout(() => {
-        form.remove();
-        iframe.remove();
-      }, 2000);
-      
-      // Update booth status (not for ocr_note - just creates a note)
+
+      // ocr_note still goes to Zapier (note-only flow, no HubSpot contact/deal needed)
+      if (isNote) {
+        const webhookUrl = WEBHOOK_URLS.ocr_note;
+        if (webhookUrl) {
+          const iframe = document.createElement('iframe');
+          iframe.name = 'zapier-note-frame';
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
+          const form = document.createElement('form');
+          form.method = 'POST'; form.action = webhookUrl; form.target = 'zapier-note-frame';
+          Object.entries(payload).forEach(([k, v]) => {
+            const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = k; inp.value = v;
+            form.appendChild(inp);
+          });
+          document.body.appendChild(form); form.submit();
+          setTimeout(() => { form.remove(); iframe.remove(); }, 2000);
+        }
+      } else {
+        // Demo + Follow Up → Supabase edge function (HubSpot + Slack)
+        const hsRes = await fetch(HUBSPOT_FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({
+            action: 'submit',
+            payload: { ...payload, hsDealId: booth.hsDealId || null },
+            isDemoBooked: isDemo,
+            showName: show?.name || '',
+          }),
+        });
+        const hsData = await hsRes.json();
+        // Store HubSpot IDs on booth to prevent duplicate deal creation
+        if (hsData.contactId && !booth.recordId) booth.recordId = hsData.contactId;
+        if (hsData.dealId    && !booth.hsDealId)  booth.hsDealId = hsData.dealId;
+      }
+
+      // Update booth status — skipHsSync=true since submit already handled it
       if (isDemo) {
-        await setStatus(STATUS.DEMO_BOOKED);
+        await setStatus(STATUS.DEMO_BOOKED, true);
       } else if (!isNote) {
-        // Set warm or cold follow up based on user selection
         const newStatus = followUpType === 'cold' ? STATUS.FOLLOW_UP_COLD
           : followUpType === 'intro' ? STATUS.FOLLOW_UP_WARM_INTRO
           : STATUS.FOLLOW_UP_WARM_DIRECT;
-        await setStatus(newStatus);
+        await setStatus(newStatus, true);
       }
       
       // Update booth with latest values

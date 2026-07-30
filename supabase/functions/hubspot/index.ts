@@ -5,6 +5,8 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const PORTAL_ID = '22466049';
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
@@ -26,7 +28,7 @@ serve(async (req) => {
   const body = await req.json();
   const { action } = body;
 
-  // Search contact by email
+  // ── Search contact by email (used by CRM Bot badge) ──────────────────────
   if (action === 'search') {
     const { email } = body;
     const data = await hs('/crm/v3/objects/contacts/search', 'POST', {
@@ -37,105 +39,144 @@ serve(async (req) => {
     return json({ found: (data.total ?? 0) > 0, id: data.results?.[0]?.id ?? null });
   }
 
-  // Create contact (legacy direct call)
+  // ── Legacy direct create ──────────────────────────────────────────────────
   if (action === 'create') {
     const { properties } = body;
     const data = await hs('/crm/v3/objects/contacts', 'POST', { properties });
     return json({ id: data.id ?? null, error: data.message ?? null });
   }
 
-  // Full sync: find/create/update contact + optionally create deal + Slack notification
+  // ── Silent background sync (status change without submit modal) ───────────
+  // Finds/creates contact, creates deal if demo booked. No Slack.
   if (action === 'sync') {
-    const { booth, showName, isDemoBooked, notifySlack } = body;
+    const { booth, showName, isDemoBooked } = body;
+    const { contactId, contactCreated, dealId } = await syncContact(hs, booth, showName, isDemoBooked);
+    return json({ contactId, contactCreated, dealId });
+  }
 
-    // Build contact properties from booth data
-    const nameParts = (booth.contactName || '').trim().split(/\s+/);
-    const firstName = nameParts[0] || '';
-    const lastName  = nameParts.slice(1).join(' ') || '';
+  // ── Full submit (replaces Zapier: contact + deal + Slack) ─────────────────
+  if (action === 'submit') {
+    const { payload, isDemoBooked, showName } = body;
 
-    const contactProps: Record<string, string> = {
-      company:        booth.companyName || '',
-      hs_lead_source: 'TRADESHOW',
+    // Build a booth-shaped object from the submit payload for syncContact
+    const booth = {
+      companyName:         payload.companyName,
+      contactName:         payload.contactName,
+      contactTitle:        payload.contactTitle,
+      contactEmail:        payload.contactEmail,
+      contactPhone:        payload.contactPhone,
+      domain:              payload.domain,
+      recordId:            payload.recordId  || null,
+      hsDealId:            payload.hsDealId  || null,
+      estimatedMonthlySales: null,
     };
-    if (booth.contactEmail) contactProps.email     = booth.contactEmail;
-    if (firstName)          contactProps.firstname = firstName;
-    if (lastName)           contactProps.lastname  = lastName;
-    if (booth.contactTitle) contactProps.jobtitle  = booth.contactTitle;
-    if (booth.contactPhone) contactProps.phone     = booth.contactPhone;
-    if (booth.domain)       contactProps.website   = booth.domain;
 
-    let contactId: string | null = null;
-    let contactCreated = false;
+    const { contactId, dealId } = await syncContact(hs, booth, showName, isDemoBooked);
 
-    if (booth.contactEmail) {
-      const search = await hs('/crm/v3/objects/contacts/search', 'POST', {
-        filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: booth.contactEmail }] }],
-        limit: 1,
-        properties: ['email', 'firstname', 'lastname'],
-      });
-
-      if ((search.total ?? 0) > 0) {
-        contactId = search.results[0].id;
-        // Update existing contact properties
-        await hs(`/crm/v3/objects/contacts/${contactId}`, 'PATCH', { properties: contactProps });
-      } else {
-        const created = await hs('/crm/v3/objects/contacts', 'POST', { properties: contactProps });
-        contactId = created.id ?? null;
-        contactCreated = true;
-      }
-    }
-
-    // Create deal for Demo Booked (only when we have a contact and no existing deal)
-    let dealId: string | null = null;
-    if (isDemoBooked && contactId && !booth.hsDealId) {
-      const pipeline  = Deno.env.get('HUBSPOT_DEAL_PIPELINE') || 'default';
-      const dealStage = Deno.env.get('HUBSPOT_DEAL_STAGE')    || 'appointmentscheduled';
-
-      const dealProps: Record<string, string> = {
-        dealname:  `${booth.companyName || 'Unknown'} — ${showName || 'Tradeshow'} Demo`,
-        pipeline,
-        dealstage: dealStage,
-      };
-      if (booth.estimatedMonthlySales) dealProps.amount = String(booth.estimatedMonthlySales);
-
-      const deal = await hs('/crm/v3/objects/deals', 'POST', { properties: dealProps });
-      dealId = deal.id ?? null;
-
-      if (dealId) {
-        await hs(
-          `/crm/v3/objects/deals/${dealId}/associations/contacts/${contactId}/deal_to_contact`,
-          'PUT'
-        );
-      }
-    }
-
-    // Slack notification (only fires when notifySlack=true, i.e. first time entering Follow Up/Demo)
+    // Build Slack message matching the old Zapier format
     const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL');
-    if (slackWebhook && notifySlack) {
-      const header = isDemoBooked ? '🗓️ *Demo Booked*' : '🔥 *Follow Up*';
-      const lines  = [
-        `${header} — ${booth.companyName || 'Unknown'}`,
-        booth.contactName
-          ? `👤 ${booth.contactName}${booth.contactTitle ? `, ${booth.contactTitle}` : ''}`
-          : null,
-        booth.contactEmail ? `✉️ ${booth.contactEmail}` : null,
-        booth.platform ? `🛒 ${booth.platform}` : null,
-        booth.estimatedMonthlySales
-          ? `💰 ~$${Number(booth.estimatedMonthlySales).toLocaleString()}/mo`
-          : null,
-        booth.notes  ? `📝 ${booth.notes}` : null,
-        showName     ? `📍 ${showName}`    : null,
-      ].filter(Boolean).join('\n');
+    if (slackWebhook) {
+      const statusLabel = isDemoBooked ? 'Demo Booked' : 'Follow Up';
+      const username    = `TST ${showName} | ${statusLabel}`;
+      const hasCard     = payload.hasBusinessCard ? 'true' : 'false';
+      const orders      = payload.ordersPerMonth  || 'N/A';
+      const aov         = payload.aov             || 'N/A';
+      const notes       = payload.notes           || 'N/A';
+
+      let hsLink = '';
+      if (isDemoBooked && dealId) {
+        hsLink = `\n<https://app.hubspot.com/contacts/${PORTAL_ID}/record/0-3/${dealId}|View Deal>`;
+      } else if (payload.hubspotCompanyUrl) {
+        hsLink = `\n<${payload.hubspotCompanyUrl}|View Company>`;
+      } else if (contactId) {
+        hsLink = `\n<https://app.hubspot.com/contacts/${PORTAL_ID}/record/0-1/${contactId}|View Contact>`;
+      }
+
+      let text: string;
+      if (isDemoBooked) {
+        text = `Demo Booked! by ${payload.repName}\n\nContact: ${payload.contactName}\nCompany: ${payload.companyName}\nBusiness Card Submitted: ${hasCard}\nMonthly store orders: ${orders}\nAOV: ${aov}\nNotes: ${notes}\n—${hsLink}`;
+      } else {
+        text = `${payload.campaign || showName} Follow Up Submission by ${payload.repName}\n\nContact: ${payload.contactName}\nCompany: ${payload.companyName}\nBusiness Card Submitted: ${hasCard}\nMonthly store orders: ${orders}\nAOV: ${aov}\nNotes: ${notes}\n—${hsLink}`;
+      }
+
+      const slackBody: Record<string, unknown> = { username, text, icon_emoji: ':bar_chart:' };
+      if (payload.businessCardUrl) {
+        slackBody.attachments = [{ image_url: payload.businessCardUrl, fallback: 'Business Card' }];
+      }
 
       await fetch(slackWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: lines }),
+        body: JSON.stringify(slackBody),
       });
     }
 
-    return json({ contactId, contactCreated, dealId });
+    return json({ contactId, dealId });
   }
 
   return json({ error: 'Unknown action' }, 400);
 });
+
+// ── Shared contact + deal sync logic ─────────────────────────────────────────
+async function syncContact(
+  hs: (path: string, method: string, body?: unknown) => Promise<unknown>,
+  booth: Record<string, unknown>,
+  showName: string,
+  isDemoBooked: boolean,
+): Promise<{ contactId: string | null; contactCreated: boolean; dealId: string | null }> {
+  const nameParts = ((booth.contactName as string) || '').trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName  = nameParts.slice(1).join(' ') || '';
+
+  const contactProps: Record<string, string> = {
+    company:        (booth.companyName as string) || '',
+    hs_lead_source: 'TRADESHOW',
+  };
+  if (booth.contactEmail) contactProps.email     = booth.contactEmail as string;
+  if (firstName)          contactProps.firstname = firstName;
+  if (lastName)           contactProps.lastname  = lastName;
+  if (booth.contactTitle) contactProps.jobtitle  = booth.contactTitle as string;
+  if (booth.contactPhone) contactProps.phone     = booth.contactPhone as string;
+  if (booth.domain)       contactProps.website   = booth.domain as string;
+
+  let contactId: string | null = null;
+  let contactCreated = false;
+
+  if (booth.contactEmail) {
+    const search = await hs('/crm/v3/objects/contacts/search', 'POST', {
+      filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: booth.contactEmail }] }],
+      limit: 1,
+      properties: ['email'],
+    }) as { total?: number; results?: Array<{ id: string }> };
+
+    if ((search.total ?? 0) > 0) {
+      contactId = search.results![0].id;
+      await hs(`/crm/v3/objects/contacts/${contactId}`, 'PATCH', { properties: contactProps });
+    } else {
+      const created = await hs('/crm/v3/objects/contacts', 'POST', { properties: contactProps }) as { id?: string };
+      contactId = created.id ?? null;
+      contactCreated = true;
+    }
+  }
+
+  let dealId: string | null = null;
+  if (isDemoBooked && contactId && !booth.hsDealId) {
+    const pipeline  = Deno.env.get('HUBSPOT_DEAL_PIPELINE') || 'default';
+    const dealStage = Deno.env.get('HUBSPOT_DEAL_STAGE')    || 'appointmentscheduled';
+    const dealProps: Record<string, string> = {
+      dealname:  `${(booth.companyName as string) || 'Unknown'} — ${showName || 'Tradeshow'} Demo`,
+      pipeline,
+      dealstage: dealStage,
+    };
+    if (booth.estimatedMonthlySales) dealProps.amount = String(booth.estimatedMonthlySales);
+
+    const deal = await hs('/crm/v3/objects/deals', 'POST', { properties: dealProps }) as { id?: string };
+    dealId = deal.id ?? null;
+
+    if (dealId) {
+      await hs(`/crm/v3/objects/deals/${dealId}/associations/contacts/${contactId}/deal_to_contact`, 'PUT');
+    }
+  }
+
+  return { contactId, contactCreated, dealId };
+}
