@@ -1388,13 +1388,56 @@ async function showDetailView(id) {
   document.getElementById('detail-view').classList.add('active');
 }
 
+const HS_SYNC_STATUSES = new Set([
+  STATUS.FOLLOW_UP_WARM,
+  STATUS.FOLLOW_UP_WARM_DIRECT,
+  STATUS.FOLLOW_UP_WARM_INTRO,
+  STATUS.FOLLOW_UP_COLD,
+  STATUS.DEMO_BOOKED,
+]);
+
 async function setStatus(status) {
   const booth = booths.find(b => b.id === currentBoothId);
   if (booth) {
+    const prevStatus = booth.status;
     booth.status = status;
     await saveBooth(booth);
     showDetailView(currentBoothId);
     renderBoothList();
+
+    if (HS_SYNC_STATUSES.has(status)) {
+      const show = shows.find(s => s.id === currentShowId);
+      // Only send Slack notification on first transition into this category
+      const notifySlack = !HS_SYNC_STATUSES.has(prevStatus);
+      syncToHubSpot(booth, show, status === STATUS.DEMO_BOOKED, notifySlack);
+    }
+  }
+}
+
+async function syncToHubSpot(booth, show, isDemoBooked, notifySlack) {
+  try {
+    const res = await fetch(HUBSPOT_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        action: 'sync',
+        booth,
+        showName: show?.name || '',
+        isDemoBooked,
+        notifySlack,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { console.warn('HubSpot sync error:', data.error); return; }
+    // Store HubSpot IDs back on booth to prevent duplicate deal creation
+    const b = booths.find(b => b.id === booth.id);
+    if (b) {
+      if (data.contactId && !b.recordId)  { b.recordId  = data.contactId; }
+      if (data.dealId    && !b.hsDealId)  { b.hsDealId  = data.dealId;    }
+      if (data.contactId || data.dealId)  { await saveBooth(b); }
+    }
+  } catch (e) {
+    console.warn('HubSpot sync failed:', e);
   }
 }
 
