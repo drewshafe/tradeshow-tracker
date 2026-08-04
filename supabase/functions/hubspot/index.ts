@@ -99,9 +99,12 @@ serve(async (req) => {
         text = `${payload.campaign || showName} Follow Up Submission by ${payload.repName}\n\nContact: ${payload.contactName}\nCompany: ${payload.companyName}\nBusiness Card Submitted: ${hasCard}\nMonthly store orders: ${orders}\nAOV: ${aov}\nNotes: ${notes}\n—${hsLink}`;
       }
 
-      const TRACKER_URL = 'https://drewshafe.github.io/tradeshow-tracker/';
-      const LOGO_URL    = 'https://drewshafe.github.io/tradeshow-tracker/TST_showsheets.png';
-      const trackerLink = `\n<${TRACKER_URL}|Open Show Sheets>`;
+      const BASE_URL  = 'https://drewshafe.github.io/tradeshow-tracker/';
+      const LOGO_URL  = `${BASE_URL}TST_showsheets.png`;
+      const deepLink  = payload.boothId && payload.showId && payload.repId
+        ? `${BASE_URL}#show=${payload.showId}&rep=${payload.repId}&booth=${payload.boothId}`
+        : BASE_URL;
+      const trackerLink = `\n<${deepLink}|Open in Show Sheets>`;
       const fullText    = text + trackerLink;
 
       const attachments: Record<string, unknown>[] = [];

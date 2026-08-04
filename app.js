@@ -314,17 +314,27 @@ function getFilesSection(booth) {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    console.log('Initializing...');
     await initDB();
-    console.log('DB initialized');
     await loadShows();
-    console.log('Shows loaded:', shows.length);
     setupEventListeners();
-    console.log('Ready');
+    await handleDeepLink();
   } catch (e) {
     console.error('Init error:', e);
   }
 });
+
+async function handleDeepLink() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  const params = Object.fromEntries(new URLSearchParams(hash));
+  const { show: showId, rep: repId, booth: boothId } = params;
+  if (!showId || !repId || !boothId) return;
+  // Clear the hash so reloads don't re-trigger
+  history.replaceState(null, '', window.location.pathname);
+  await selectShow(showId);
+  await selectRep(repId);
+  showDetailView(boothId);
+}
 
 window.addEventListener('beforeunload', () => releaseCamera());
 
@@ -1749,7 +1759,10 @@ function showSubmitModal(type) {
       businessCardUrl: booth.businessCardUrl || '',
       recordId: booth.recordId || '',
       hubspotCompanyUrl: booth.hubspotUrl || booth.hubspot_url || '',
-      type: type
+      type: type,
+      boothId: booth.id,
+      showId: currentShowId,
+      repId: currentRepId,
     };
     
     if (isDemo) {
