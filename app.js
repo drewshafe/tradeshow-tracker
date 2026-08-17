@@ -2270,7 +2270,9 @@ async function renderDashboard() {
   container.innerHTML = `
     <div class="dashboard-actions">
       <button class="btn secondary small dash-hs-sync-btn" id="sync-hs-btn"><i class="fab fa-hubspot"></i> Check HubSpot</button>
+      <button class="btn primary small dash-hs-bulk-btn" id="bulk-sync-hs-btn"><i class="fab fa-hubspot"></i> Bulk Sync to HubSpot</button>
     </div>
+    <div id="bulk-sync-progress" class="bulk-sync-progress hidden"></div>
     <div class="dashboard-totals">
       <div class="total-card green dash-expandable" data-target="demos">
         <span class="total-value">${totals.demos}</span><label>Demos <i class="fas fa-chevron-down"></i></label>
@@ -2322,6 +2324,7 @@ async function renderDashboard() {
   });
 
   document.getElementById('sync-hs-btn')?.addEventListener('click', syncHubSpot);
+  document.getElementById('bulk-sync-hs-btn')?.addEventListener('click', bulkSyncToHubSpot);
 }
 
 async function syncHubSpot() {
@@ -2399,6 +2402,80 @@ async function syncHubSpot() {
 
   btn.disabled = false;
   btn.innerHTML = '<i class="fab fa-hubspot"></i> Check HubSpot';
+}
+
+async function bulkSyncToHubSpot() {
+  const show = shows.find(s => s.id === currentShowId);
+  const syncable = (dashboardBooths || []).filter(b => HS_SYNC_STATUSES.has(b.status));
+
+  if (syncable.length === 0) {
+    alert('No Follow Up or Demo Booked leads to sync for this show.');
+    return;
+  }
+
+  const confirmed = confirm(
+    `Sync ${syncable.length} lead${syncable.length !== 1 ? 's' : ''} to HubSpot for ${show?.name || 'this show'}?\n\n` +
+    `This will create/update contacts and create deals for Demo Booked entries. Already-synced records will be skipped or updated safely.`
+  );
+  if (!confirmed) return;
+
+  const btn = document.getElementById('bulk-sync-hs-btn');
+  const progress = document.getElementById('bulk-sync-progress');
+  btn.disabled = true;
+  progress.classList.remove('hidden');
+
+  let done = 0, created = 0, updated = 0, deals = 0, errors = 0;
+
+  const updateProgress = (msg) => {
+    progress.innerHTML = `<span>${msg}</span>`;
+  };
+
+  for (const booth of syncable) {
+    updateProgress(`Syncing ${done + 1} of ${syncable.length}: ${booth.companyName || 'Unknown'}…`);
+    try {
+      const res = await fetch(HUBSPOT_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          action: 'sync',
+          booth,
+          showName: show?.name || '',
+          isDemoBooked: booth.status === STATUS.DEMO_BOOKED,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        errors++;
+      } else {
+        if (data.contactCreated) created++; else if (data.contactId) updated++;
+        if (data.dealId) deals++;
+
+        // Persist HubSpot IDs back to the booth record
+        const live = booths.find(b => b.id === booth.id);
+        if (live) {
+          if (data.contactId && !live.recordId) live.recordId = data.contactId;
+          if (data.dealId    && !live.hsDealId)  live.hsDealId = data.dealId;
+          if (data.contactId || data.dealId) await saveBooth(live);
+        }
+        // Also update dashboardBooths reference so re-check sees fresh IDs
+        if (data.contactId && !booth.recordId) booth.recordId = data.contactId;
+        if (data.dealId    && !booth.hsDealId)  booth.hsDealId = data.dealId;
+      }
+    } catch {
+      errors++;
+    }
+    done++;
+  }
+
+  const parts = [];
+  if (created) parts.push(`${created} new contact${created !== 1 ? 's' : ''}`);
+  if (updated) parts.push(`${updated} updated`);
+  if (deals)   parts.push(`${deals} deal${deals !== 1 ? 's' : ''} created`);
+  if (errors)  parts.push(`${errors} error${errors !== 1 ? 's' : ''}`);
+
+  updateProgress(`Done — ${syncable.length} leads synced. ${parts.join(' · ') || 'Nothing new to sync.'}`);
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fab fa-hubspot"></i> Bulk Sync to HubSpot';
 }
 
 async function checkCrmBotStatus(booth) {
