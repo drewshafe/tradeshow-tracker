@@ -46,35 +46,39 @@ serve(async (req) => {
     return json({ id: data.id ?? null, error: data.message ?? null });
   }
 
-  // ── Silent background sync (status change without submit modal) ───────────
-  // Finds/creates contact, creates deal if demo booked. No Slack.
+  // ── Silent background sync (status change, no Slack, no task) ─────────────
   if (action === 'sync') {
     const { booth, showName, isDemoBooked, repOwnerId } = body;
-    const { contactId, contactCreated, dealId } = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId);
-    return json({ contactId, contactCreated, dealId });
+    const result = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId, null, null);
+    return json({ contactId: result.contactId, contactCreated: result.contactCreated, dealId: result.dealId });
   }
 
-  // ── Full submit (replaces Zapier: contact + deal + Slack) ─────────────────
+  // ── Full submit (contact + company + deal/task + Slack) ───────────────────
   if (action === 'submit') {
     const { payload, isDemoBooked, showName } = body;
 
-    // Build a booth-shaped object from the submit payload for syncContact
     const booth = {
-      companyName:         payload.companyName,
-      contactName:         payload.contactName,
-      contactTitle:        payload.contactTitle,
-      contactEmail:        payload.contactEmail,
-      contactPhone:        payload.contactPhone,
-      domain:              payload.domain,
-      recordId:            payload.recordId  || null,
-      hsDealId:            payload.hsDealId  || null,
+      companyName:           payload.companyName,
+      contactName:           payload.contactName,
+      contactTitle:          payload.contactTitle,
+      contactEmail:          payload.contactEmail,
+      contactPhone:          payload.contactPhone,
+      domain:                payload.domain,
+      recordId:              payload.recordId  || null,
+      hsDealId:              payload.hsDealId  || null,
       estimatedMonthlySales: null,
     };
 
     const repOwnerId = payload.repHubSpotId || null;
-    const { contactId, dealId } = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId);
+    // Tasks only for follow-ups (demos get a deal instead)
+    const taskDate   = !isDemoBooked ? (payload.taskDate || null) : null;
+    const taskNotes  = payload.notes || null;
 
-    // Build Slack message matching the old Zapier format
+    const { contactId, dealId } = await syncContact(
+      hs, booth, showName, isDemoBooked, repOwnerId, taskDate, taskNotes,
+    );
+
+    // ── Slack notification ─────────────────────────────────────────────────
     const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL');
     if (slackWebhook) {
       const statusLabel = isDemoBooked ? 'Demo Booked' : 'Follow Up';
@@ -100,30 +104,22 @@ serve(async (req) => {
         text = `${payload.campaign || showName} Follow Up Submission by ${payload.repName}\n\nContact: ${payload.contactName}\nCompany: ${payload.companyName}\nBusiness Card Submitted: ${hasCard}\nMonthly store orders: ${orders}\nAOV: ${aov}\nNotes: ${notes}\n—${hsLink}`;
       }
 
-      const BASE_URL  = 'https://drewshafe.github.io/tradeshow-tracker/';
-      const LOGO_URL  = `${BASE_URL}TST_showsheets.png`;
-      const deepLink  = payload.boothId && payload.showId && payload.repId
+      const BASE_URL    = 'https://drewshafe.github.io/tradeshow-tracker/';
+      const LOGO_URL    = `${BASE_URL}TST_showsheets.png`;
+      const deepLink    = payload.boothId && payload.showId && payload.repId
         ? `${BASE_URL}#show=${payload.showId}&rep=${payload.repId}&booth=${payload.boothId}`
         : BASE_URL;
       const trackerLink = `\n<${deepLink}|Open in Show Sheets>`;
-      const fullText    = text + trackerLink;
 
       const attachments: Record<string, unknown>[] = [];
       if (payload.businessCardUrl) {
         attachments.push({ image_url: payload.businessCardUrl, fallback: 'Business Card' });
       }
 
-      const slackBody: Record<string, unknown> = {
-        username,
-        text: fullText,
-        icon_url: LOGO_URL,
-        attachments,
-      };
-
       await fetch(slackWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slackBody),
+        body: JSON.stringify({ username, text: text + trackerLink, icon_url: LOGO_URL, attachments }),
       });
     }
 
@@ -133,18 +129,23 @@ serve(async (req) => {
   return json({ error: 'Unknown action' }, 400);
 });
 
-// ── Shared contact + deal sync logic ─────────────────────────────────────────
+// ── Shared sync logic ─────────────────────────────────────────────────────────
+// Owner is set ONLY when creating new records — never overwritten on existing ones
+// to avoid displacing existing CRM ownership.
 async function syncContact(
   hs: (path: string, method: string, body?: unknown) => Promise<unknown>,
   booth: Record<string, unknown>,
   showName: string,
   isDemoBooked: boolean,
   repOwnerId?: string | null,
+  taskDate?: string | null,
+  taskNotes?: string | null,
 ): Promise<{ contactId: string | null; contactCreated: boolean; dealId: string | null }> {
   const nameParts = ((booth.contactName as string) || '').trim().split(/\s+/);
   const firstName = nameParts[0] || '';
   const lastName  = nameParts.slice(1).join(' ') || '';
 
+  // ── 1. Find/create contact ────────────────────────────────────────────────
   const contactProps: Record<string, string> = {
     company:        (booth.companyName as string) || '',
     hs_lead_source: 'TRADESHOW',
@@ -168,14 +169,51 @@ async function syncContact(
 
     if ((search.total ?? 0) > 0) {
       contactId = search.results![0].id;
+      // Update without touching owner — respect existing assignment
       await hs(`/crm/v3/objects/contacts/${contactId}`, 'PATCH', { properties: contactProps });
     } else {
+      // New contact: assign rep as owner
+      if (repOwnerId) contactProps.hubspot_owner_id = repOwnerId;
       const created = await hs('/crm/v3/objects/contacts', 'POST', { properties: contactProps }) as { id?: string };
       contactId = created.id ?? null;
       contactCreated = true;
     }
   }
 
+  // ── 2. Find/create company ────────────────────────────────────────────────
+  let companyId: string | null = null;
+
+  const searchCompany = async (prop: string, value: string): Promise<string | null> => {
+    const res = await hs('/crm/v3/objects/companies/search', 'POST', {
+      filterGroups: [{ filters: [{ propertyName: prop, operator: 'EQ', value }] }],
+      limit: 1,
+      properties: ['domain', 'name'],
+    }) as { total?: number; results?: Array<{ id: string }> };
+    return (res.total ?? 0) > 0 ? res.results![0].id : null;
+  };
+
+  try {
+    if (booth.domain)       companyId = await searchCompany('domain', booth.domain as string);
+    if (!companyId && booth.companyName) companyId = await searchCompany('name', booth.companyName as string);
+
+    if (!companyId && booth.companyName) {
+      // New company: assign rep as owner
+      const companyProps: Record<string, string> = { name: booth.companyName as string };
+      if (booth.domain) companyProps.domain = booth.domain as string;
+      if (repOwnerId)   companyProps.hubspot_owner_id = repOwnerId;
+      const created = await hs('/crm/v3/objects/companies', 'POST', { properties: companyProps }) as { id?: string };
+      companyId = created.id ?? null;
+    }
+
+    // Associate contact → company
+    if (contactId && companyId) {
+      await hs(`/crm/v3/objects/contacts/${contactId}/associations/companies/${companyId}/contact_to_company`, 'PUT');
+    }
+  } catch {
+    // Company steps are best-effort — don't block the rest of the sync
+  }
+
+  // ── 3. Deal (Demo Booked only) ────────────────────────────────────────────
   let dealId: string | null = null;
   if (isDemoBooked && contactId && !booth.hsDealId) {
     const pipeline  = Deno.env.get('HUBSPOT_DEAL_PIPELINE') || 'default';
@@ -193,6 +231,38 @@ async function syncContact(
 
     if (dealId) {
       await hs(`/crm/v3/objects/deals/${dealId}/associations/contacts/${contactId}/deal_to_contact`, 'PUT');
+      if (companyId) {
+        await hs(`/crm/v3/objects/deals/${dealId}/associations/companies/${companyId}/deal_to_company`, 'PUT');
+      }
+    }
+  }
+
+  // ── 4. Follow-up task (submit only, when rep picked a date) ──────────────
+  if (!isDemoBooked && taskDate && contactId && repOwnerId) {
+    try {
+      const contactName = (booth.contactName as string) || 'Contact';
+      const companyName = (booth.companyName as string) || 'Unknown';
+      const taskBody = `Follow up: ${contactName} at ${companyName} — ${showName}${taskNotes ? `\n\n${taskNotes}` : ''}`;
+
+      const task = await hs('/crm/v3/objects/tasks', 'POST', {
+        properties: {
+          hs_task_body:     taskBody,
+          hs_timestamp:     new Date(taskDate).toISOString(),
+          hs_task_status:   'NOT_STARTED',
+          hs_task_type:     'TODO',
+          hubspot_owner_id: repOwnerId,
+        },
+      }) as { id?: string };
+
+      const taskId = task.id ?? null;
+      if (taskId) {
+        await hs(`/crm/v3/objects/tasks/${taskId}/associations/contacts/${contactId}/task_to_contact`, 'PUT');
+        if (companyId) {
+          await hs(`/crm/v3/objects/tasks/${taskId}/associations/companies/${companyId}/task_to_company`, 'PUT');
+        }
+      }
+    } catch {
+      // Task creation is best-effort
     }
   }
 
