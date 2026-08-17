@@ -49,8 +49,8 @@ serve(async (req) => {
   // ── Silent background sync (status change without submit modal) ───────────
   // Finds/creates contact, creates deal if demo booked. No Slack.
   if (action === 'sync') {
-    const { booth, showName, isDemoBooked } = body;
-    const { contactId, contactCreated, dealId } = await syncContact(hs, booth, showName, isDemoBooked);
+    const { booth, showName, isDemoBooked, repOwnerId } = body;
+    const { contactId, contactCreated, dealId } = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId);
     return json({ contactId, contactCreated, dealId });
   }
 
@@ -71,7 +71,8 @@ serve(async (req) => {
       estimatedMonthlySales: null,
     };
 
-    const { contactId, dealId } = await syncContact(hs, booth, showName, isDemoBooked);
+    const repOwnerId = payload.repHubSpotId || null;
+    const { contactId, dealId } = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId);
 
     // Build Slack message matching the old Zapier format
     const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL');
@@ -138,6 +139,7 @@ async function syncContact(
   booth: Record<string, unknown>,
   showName: string,
   isDemoBooked: boolean,
+  repOwnerId?: string | null,
 ): Promise<{ contactId: string | null; contactCreated: boolean; dealId: string | null }> {
   const nameParts = ((booth.contactName as string) || '').trim().split(/\s+/);
   const firstName = nameParts[0] || '';
@@ -183,6 +185,7 @@ async function syncContact(
       pipeline,
       dealstage: dealStage,
     };
+    if (repOwnerId)                  dealProps.hubspot_owner_id = repOwnerId;
     if (booth.estimatedMonthlySales) dealProps.amount = String(booth.estimatedMonthlySales);
 
     const deal = await hs('/crm/v3/objects/deals', 'POST', { properties: dealProps }) as { id?: string };

@@ -1432,6 +1432,7 @@ async function syncToHubSpot(booth, show, isDemoBooked) {
         booth,
         showName: show?.name || '',
         isDemoBooked,
+        repOwnerId: getHubSpotOwnerId(booth.repId),
       }),
     });
     const data = await res.json();
@@ -2441,6 +2442,7 @@ async function bulkSyncToHubSpot() {
           booth,
           showName: show?.name || '',
           isDemoBooked: booth.status === STATUS.DEMO_BOOKED,
+          repOwnerId: getHubSpotOwnerId(booth.repId),
         }),
       });
       const data = await res.json();
