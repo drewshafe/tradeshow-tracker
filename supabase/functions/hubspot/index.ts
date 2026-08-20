@@ -50,7 +50,7 @@ serve(async (req) => {
   if (action === 'sync') {
     const { booth, showName, isDemoBooked, repOwnerId } = body;
     const result = await syncContact(hs, booth, showName, isDemoBooked, repOwnerId, null, null);
-    return json({ contactId: result.contactId, contactCreated: result.contactCreated, dealId: result.dealId });
+    return json({ contactId: result.contactId, contactCreated: result.contactCreated, dealId: result.dealId, companyId: result.companyId });
   }
 
   // ── Full submit (contact + company + deal/task + Slack) ───────────────────
@@ -74,9 +74,41 @@ serve(async (req) => {
     const taskDate   = !isDemoBooked ? (payload.taskDate || null) : null;
     const taskNotes  = payload.notes || null;
 
-    const { contactId, dealId } = await syncContact(
+    const { contactId, dealId, companyId } = await syncContact(
       hs, booth, showName, isDemoBooked, repOwnerId, taskDate, taskNotes,
     );
+
+    // ── HubSpot note via v1 Engagements API ───────────────────────────────
+    const notes = payload.notes || '';
+    if (notes && (contactId || dealId)) {
+      try {
+        const noteBody = [
+          `${isDemoBooked ? 'Demo Booked' : 'Follow Up'} — ${showName}`,
+          `Rep: ${payload.repName || ''}`,
+          payload.ordersPerMonth ? `Monthly orders: ${payload.ordersPerMonth}` : '',
+          payload.aov           ? `AOV: ${payload.aov}`                       : '',
+          `Notes: ${notes}`,
+        ].filter(Boolean).join('\n');
+
+        const associations: Record<string, number[]> = {};
+        if (contactId) associations.contactIds = [parseInt(contactId)];
+        if (companyId) associations.companyIds  = [parseInt(companyId)];
+        if (dealId)    associations.dealIds      = [parseInt(dealId)];
+
+        await hs('/engagements/v1/engagements', 'POST', {
+          engagement: {
+            active:    true,
+            ownerId:   repOwnerId ? parseInt(repOwnerId) : undefined,
+            type:      'NOTE',
+            timestamp: new Date().getTime(),
+          },
+          associations,
+          metadata: { body: noteBody },
+        });
+      } catch {
+        // Note creation is best-effort
+      }
+    }
 
     // ── Slack notification ─────────────────────────────────────────────────
     const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL');
@@ -140,7 +172,7 @@ async function syncContact(
   repOwnerId?: string | null,
   taskDate?: string | null,
   taskNotes?: string | null,
-): Promise<{ contactId: string | null; contactCreated: boolean; dealId: string | null }> {
+): Promise<{ contactId: string | null; contactCreated: boolean; dealId: string | null; companyId: string | null }> {
   const nameParts = ((booth.contactName as string) || '').trim().split(/\s+/);
   const firstName = nameParts[0] || '';
   const lastName  = nameParts.slice(1).join(' ') || '';
@@ -266,5 +298,5 @@ async function syncContact(
     }
   }
 
-  return { contactId, contactCreated, dealId };
+  return { contactId, contactCreated, dealId, companyId };
 }
