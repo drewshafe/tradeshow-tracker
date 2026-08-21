@@ -158,6 +158,32 @@ serve(async (req) => {
     return json({ contactId, dealId });
   }
 
+  // ── Retroactive note (backfill from Slack data) ───────────────────────────
+  if (action === 'create_note') {
+    const { companyId, dealId, contactId, noteBody, repOwnerId } = body;
+    const associations: Record<string, number[]> = {};
+    if (contactId) associations.contactIds = [parseInt(contactId)];
+    if (companyId) associations.companyIds  = [parseInt(companyId)];
+    if (dealId)    associations.dealIds      = [parseInt(dealId)];
+
+    if (!noteBody || Object.keys(associations).length === 0) {
+      return json({ error: 'noteBody and at least one of companyId/dealId/contactId required' }, 400);
+    }
+
+    const ts = body.timestamp ? parseInt(body.timestamp) : new Date().getTime();
+    const result = await hs('/engagements/v1/engagements', 'POST', {
+      engagement: {
+        active:    true,
+        ownerId:   repOwnerId ? parseInt(repOwnerId) : undefined,
+        type:      'NOTE',
+        timestamp: ts,
+      },
+      associations,
+      metadata: { body: noteBody },
+    });
+    return json({ success: true, result });
+  }
+
   return json({ error: 'Unknown action' }, 400);
 });
 
