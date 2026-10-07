@@ -42,7 +42,7 @@
 
   window.saveShow = async function(show) {
     if (useSupabase) {
-      await sbClient.from('shows').upsert({
+      const { error } = await sbClient.from('shows').upsert({
         id: show.id, name: show.name, location: show.location,
         start_date: show.startDate, end_date: show.endDate,
         website: show.website, exhibitor_list: show.exhibitorList,
@@ -50,6 +50,7 @@
         aligned_room_url: show.alignedRoomUrl || null,
         hall_config: show.hallConfig || show.hall_config || null
       });
+      if (error) throw error;
     } else {
       const shows = await window.getShows();
       const idx = shows.findIndex(s => s.id === show.id);
@@ -85,7 +86,8 @@
 
   window.saveRep = async function(rep) {
     if (useSupabase) {
-      await sbClient.from('reps').upsert({ id: rep.id, name: rep.name, hubspot_id: rep.hubspotId });
+      const { error } = await sbClient.from('reps').upsert({ id: rep.id, name: rep.name, hubspot_id: rep.hubspotId });
+      if (error) throw error;
     } else {
       const reps = await window.getReps();
       const idx = reps.findIndex(r => r.id === rep.id);
